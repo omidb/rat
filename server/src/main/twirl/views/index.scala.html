@@ -1,0 +1,28 @@
+@(title: String)(implicit config: play.api.Configuration, env: play.api.Environment)
+@import views.html.tags._
+
+<!DOCTYPE html>
+
+<html lang="en">
+    <head>
+        <meta charset="UTF-8">
+        <title>@title</title>
+        <meta content='width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no' name='viewport'>
+        <link rel="stylesheet" media="screen" href=@_asset("stylesheets/main.min.css") >
+        <link rel="stylesheet" media="screen" href=@_asset("stylesheets/bootstrap.min.css") >
+        <link rel="stylesheet" media="screen" href=@_asset("stylesheets/signin.css") >
+        <link rel="stylesheet" media="screen" href=@_asset("stylesheets/main1.css") >
+        <link rel="shortcut icon" type="image/png" href=@_asset("images/favicon.png") >
+        @*<script type="text/javascript" src=@_asset("js/graphlib.min.js")></script>*@
+        <script type="text/javascript" src=@_asset("js/dagre.min.js")></script>
+        <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.1.1/jquery.min.js" integrity="sha384-3ceskX3iaEnIogmQchP8opvBy3Mi7Ce34nWjpBIwVTHfGYWQS9jwHDVRnpKKHJg7" crossorigin="anonymous"></script>
+        <script src="https://cdnjs.cloudflare.com/ajax/libs/tether/1.3.7/js/tether.min.js" integrity="sha384-XTs3FgkjiBgo8qjEjBk0tGmf3wPrWtA6coPfQDfFEY8AnYJwjalXCiosYRBIBZX8" crossorigin="anonymous"></script>
+        <script src="https://maxcdn.bootstrapcdn.com/bootstrap/4.0.0-alpha.5/js/bootstrap.min.js" integrity="sha384-BLiI7JTZm+JWlgKa0M0kGRpJbF2J8q+qreVrKBC47e3K6BW78kGLrCkeRX6I9RoK" crossorigin="anonymous"></script>
+
+    </head>
+    <body style="padding-top: 10px;">
+        <div id="root">
+        </div>
+        @playscalajs.html.scripts(projectName = "client", fileName => _asset(fileName).toString)
+    </body>
+</html>

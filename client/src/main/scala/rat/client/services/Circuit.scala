@@ -19,6 +19,8 @@ import scala.scalajs.concurrent.JSExecutionContext.Implicits.queue
 case class SignIn(username: UserName) extends Action
 
 case class UpdateUser(user: User) extends Action
+case class UpdateUserG(user: User) extends Action
+case class UpdateUserT(user: User) extends Action
 
 case object CalculateAgreement extends Action
 
@@ -37,10 +39,13 @@ case class RemoveEdge(id:(Int, Int)) extends Action
 case object LayoutLF extends Action
 case class SelectAction(node:Option[Int], edge:Option[(Int, Int)]) extends Action
 
+case class AddComment(taskID:Int, value:String) extends Action
+case class AddCommentAndSave(taskID:Int, value:String) extends Action
+
 case class ModifyNode(id:Int, newVals:Map[String, String]) extends Action
 case class ModifyEdge(id:(Int,Int), newVals:String) extends Action
 case object GetUserTasks extends Action
-case class UpdateUserTasks(tasks:Option[List[GraphInfo]]) extends Action
+case class UpdateUserTasks(tasks:Option[List[TaskInfo]]) extends Action
 case class GetUserGraph(id:Int) extends Action
 case class UpdateEditorGraph(lf:Option[TripsLF]) extends Action
 
@@ -55,15 +60,88 @@ case class PushAction(action:Action) extends Action
 case object EnableUndo extends Action
 case object DisableUndo extends Action
 
+//Tasks Actions
+case object GetAllTasks extends Action
+case class UpdateAllTasks(tasks:Option[List[TaskInfo]]) extends Action
+case class DeleteTask(taskID:Int) extends Action
+case class GoldTask(taskID:Int) extends Action
+case class DeleteResult(res:ResultStatus) extends Action
+case class GoldResult(res:ResultStatus) extends Action
+case class GetTaskGraphs(id:Int) extends Action
+case class UpdateTask(lfs: Map[User, TripsLFViz]) extends Action
 
+
+case class TaskViewerHelper(tasks:Pot[List[TaskInfo]], deleteRes:Pot[ResultStatus],
+                            goldRes:Pot[ResultStatus], graphs:Pot[Map[User,TripsLFViz]])
 
 // The base model of our application
-case class RootModel(user: Pot[User], statistics: Pot[AnnotationStatistics], editorHelper: EditorHelper)
+case class RootModel(user: Pot[User], statistics: Pot[AnnotationStatistics], editorHelper: EditorHelper,
+                     taskHelper:TaskViewerHelper)
+
+
+class TasksHandler[M](modelRW: ModelRW[M, TaskViewerHelper], user:User) extends ActionHandler(modelRW){
+  override def handle = {
+    case GetAllTasks =>
+      updated(modelRW().modify(_.tasks).setTo(modelRW().tasks.pending()),
+        Effect(
+          AjaxClient[Api2].getAllTasks(user).call().map(tasks =>
+            UpdateAllTasks(tasks.map(t => t.sortBy(_.id)))
+          )
+        )
+      )
+
+    case UpdateAllTasks(tasks) =>
+      if(tasks.isDefined)
+        updated(modelRW().modify(_.tasks).setTo(Ready(tasks.get)))
+      else
+        updated(modelRW().modify(_.tasks).setTo(modelRW().tasks.unavailable()))
+
+    case DeleteTask(taskID) =>
+      updated(modelRW().modify(_.deleteRes).setTo(modelRW().deleteRes.pending()),
+        Effect(
+          AjaxClient[Api2].deleteTask(user, taskID).call().map(res => DeleteResult(res))
+        )
+      )
+
+    case GoldTask(taskID) =>
+      updated(modelRW().modify(_.goldRes).setTo(modelRW().goldRes.pending()),
+        Effect(
+          AjaxClient[Api2].goldTask(user, taskID).call().map(res => GoldResult(res))
+        )
+      )
+
+    case DeleteResult(res) => updated(modelRW().modify(_.deleteRes).setTo(Ready(res)))
+
+    case GoldResult(res) => updated(modelRW().modify(_.goldRes).setTo(Ready(res)))
+
+    case GetTaskGraphs(taskID) =>
+      updated(modelRW().modify(_.graphs).setTo(modelRW().graphs.pending()),
+        Effect(
+          AjaxClient[Api2].getTask(user, taskID).call().map(tsks =>  {
+            val ts = tsks.map {case(u,t) => u -> GraphUtil.layoutGraph(t)}
+            UpdateTask(ts)
+          })
+        )
+      )
+
+    case UpdateTask(lfs) => updated(modelRW().modify(_.graphs).setTo(Ready(lfs)))
+
+    case AddCommentAndSave(taskID, value) =>
+      updated(
+        modelRW().modify(_.tasks).setTo(modelRW().tasks.map(ti =>{
+          val x = ti.partition(_.id == taskID)
+          val x1 = x._1.map(ti2 => ti2.copy(comments = Comment(user, value) :: ti2.comments)) ::: x._2
+          x1.sortBy(_.id)
+        }))
+      )
+
+  }
+}
 
 class UserHandler[M](modelRW: ModelRW[M, Pot[User]]) extends ActionHandler(modelRW) {
   override def handle = {
     case SignIn(username) => effectOnly(Effect(AjaxClient[Api2].signIn(username).call().map(user => UpdateUser(user))))
-    case UpdateUser(user) => updated(Ready(user))
+    case UpdateUser(user) => updated(Ready(user), Effect(Future(UpdateUserG(user))))
   }
 }
 
@@ -87,13 +165,16 @@ case class SelectState(isEdge:Option[(Int, Int)], isNode:Option[Int])
 case class Alternatives(edgeAlters: Pot[List[EdgeAlternative]], nodeAlters:Pot[List[NodeAlternative]])
 
 case class UndoManager(actionStack:List[Action], undoEnable:Boolean = true)
-case class EditorHelper(lf:Pot[TripsLFViz], graphInfos:Pot[List[GraphInfo]],
+case class EditorHelper(user: User, lf:Pot[TripsLFViz], taskInfos:Pot[List[TaskInfo]],
                         dragState:Option[DragState], selectState:SelectState,
                         alternatives: Alternatives, undoManager: UndoManager)
 
 
-class GraphHandler[M](modelRW: ModelRW[M, EditorHelper], user:User) extends ActionHandler(modelRW) {
+class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(modelRW) {
   override def handle = {
+    //val user = userP.headOption.getOrElse(User.invalidUser)
+    case UpdateUserG(user) => updated(modelRW().modify(_.user).setTo(user))
+
     case EdgeEndAction(isEnter, isStart, id) =>
       val value = isEnter
       if (isStart)
@@ -241,9 +322,10 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper], user:User) extends Acti
       )
 
     case GetUserTasks =>
-      updated(modelRW().copy(graphInfos = modelRW().graphInfos.pending()),
+      println(modelRW().user)
+      updated(modelRW().copy(taskInfos = modelRW().taskInfos.pending()),
         Effect(
-          AjaxClient[Api2].getUserTasks(user).call().map(tasks =>
+          AjaxClient[Api2].getUserTasks(modelRW().user).call().map(tasks =>
             UpdateUserTasks(tasks)
           )
         )
@@ -251,14 +333,14 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper], user:User) extends Acti
 
     case UpdateUserTasks(tasks) =>
       if (tasks.isDefined)
-        updated(modelRW().copy(graphInfos = Ready(tasks.get)))
+        updated(modelRW().copy(taskInfos = Ready(tasks.get)))
       else
-        updated(modelRW().copy(graphInfos = modelRW().graphInfos.unavailable()))
+        updated(modelRW().copy(taskInfos = modelRW().taskInfos.unavailable()))
 
     case GetUserGraph(id) =>
       updated(modelRW().copy(lf = modelRW().lf.pending()),
         Effect(
-          AjaxClient[Api2].getUserGraph(user, id).call().map(lf =>
+          AjaxClient[Api2].getUserGraph(modelRW().user, id).call().map(lf =>
             UpdateEditorGraph(lf)
           )
         )
@@ -327,6 +409,16 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper], user:User) extends Acti
     case DisableUndo =>
       updated(modelRW().copy(undoManager = modelRW().undoManager.copy(undoEnable = false)))
 
+
+    case AddComment(taskID, value) =>
+      updated(
+        modelRW().modify(_.taskInfos).setTo(modelRW().taskInfos.map(ti =>{
+          val x = ti.partition(_.id == taskID)
+          val x1 = x._1.map(ti2 =>
+            ti2.copy(comments = Comment(modelRW().user, value) :: ti2.comments)) ::: x._2
+          x1.sortBy(_.id)
+        }))
+      )
   }
 }
 
@@ -335,9 +427,9 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper], user:User) extends Acti
 object MainCircuit extends Circuit[RootModel] with ReactConnector[RootModel] {
   // initial application model
   override protected def initialModel = RootModel(Empty, Empty,
-    EditorHelper(
+    EditorHelper(User.invalidUser,
       Empty, Empty, None, SelectState(None, None),Alternatives(Empty, Empty), UndoManager(List.empty)
-    )
+    ), TaskViewerHelper(Empty,Empty,Empty, Empty)
   )
 
   // combine all handlers into one
@@ -346,7 +438,10 @@ object MainCircuit extends Circuit[RootModel] with ReactConnector[RootModel] {
     new StatisticHandler(
       zoomRW(_.statistics)((m, u) => m.copy(statistics = u)), zoom(_.user.headOption.getOrElse(User.invalidUser)).value),
 
-    new GraphHandler(zoomRW(_.editorHelper)((m, u) => m.copy(editorHelper = u)),
+    new GraphHandler(zoomRW(_.editorHelper)((m, u) => m.copy(editorHelper = u))/*,
+      userP = zoomRW(_.user)((x1,x2) => x2)*/),
+
+    new TasksHandler(zoomRW(_.taskHelper)((m, u) => m.copy(taskHelper = u)),
       user = zoom(_.user.headOption.getOrElse(User.invalidUser)).value)
   )
 }

@@ -26,7 +26,7 @@ object Bootstrap {
 
   // Common Bootstrap contextual styles
   object CommonStyle extends Enumeration {
-    val default, primary, success, info, warning, danger = Value
+    val default, primary, secondary, success, info, warning, danger = Value
   }
 
   object Button {
@@ -115,11 +115,15 @@ object Bootstrap {
 
     case class Footer(nodes: ReactNode*)
 
-    case class Props(header: Option[Header] = None, footer: Option[Footer] = None, style: CommonStyle.Value = CommonStyle.default)
+    case class Props(header: Option[Header] = None,
+                     footer: Option[Footer] = None,
+                     style: CommonStyle.Value = CommonStyle.default,
+                     addStyles: Seq[TagMod] = Seq()
+                    )
 
     val component = ReactComponentB[Props]("Panel")
       .renderPC((_, p, c) =>
-        <.div(bss.cardOpt(p.style),
+        <.div(bss.cardOpt(p.style), p.addStyles,
           p.header.map(he => <.div(bss.cardHeading, he.nodes)).getOrElse(EmptyTag),
           <.div(bss.cardBlock, c)
         )
@@ -142,6 +146,27 @@ object Bootstrap {
 
     def apply(text: String, style: CommonStyle.Value = CommonStyle.default, onClick: Callback = Callback.empty) =
       component(Props(text, style, onClick))
+  }
+
+  object Popover {
+
+    case class Props(header: List[ReactNode] = List(), inside: List[ReactNode] = List(), left:Boolean = true)
+
+    val component = ReactComponentB[Props]("Label")
+      .stateless
+      .render_P(p => {
+        val side = if (p.left) "left" else "right"
+        <.div(^.className := s"popover popover-$side",
+          <.h3(^.className := "popover-title", p.header),
+          <.div(^.className := "popover-content",
+            p.inside
+          )
+        )
+      }
+      ).build
+
+    def apply(header: List[ReactNode] = List(), inside: List[ReactNode] = List(), left:Boolean = true) =
+      component(Props(header, inside, left))
   }
 
   object BTag {

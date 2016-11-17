@@ -3,19 +3,19 @@ package services
 import rat.shared.{User, UserName}
 
 object UserManager {
-  val invalidUser = User("invalid","invalid", false)
+  val invalidUser = User("invalid","invalid", "none", false)
   val users = List(
-    User("omid", "Omid Ba",true),
-    User("james", "James Allen",true),
-    User("will", "William",true),
-    User("ian", "Ian Perera",true),
-    User("bonnie", "Bonnie",true),
-    User("archna", "Archna",true),
-    User("chohman", "Chohman",true),
-    User("jansen", "Jansen",true),
-    User("lucian", "Lucian",true),
-    User("rik", "Ritwik",true),
-    User("jena", "Jena",true))
+    User("omid", "Omid", "all",true),
+    User("james", "James Allen", "all",true),
+    User("will", "William", "none",true),
+    User("ian", "Ian Perera", "none",true),
+    User("bonnie", "Bonnie", "none",true),
+    User("archna", "Archna", "none",true),
+    User("chohman", "Chohman", "none",true),
+    User("jansen", "Jansen", "none",true),
+    User("lucian", "Lucian", "none",true),
+    User("rik", "Ritwik", "none",true),
+    User("jena", "Jena", "none",true))
 
 
   lazy val activeUsers = users.filterNot(u => u.id == "lucian" || u.id == "will" || u.id=="chohman"|| u.id=="ian"|| u.id=="james")

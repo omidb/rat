@@ -143,7 +143,7 @@ object Editor {
       val lfPot = pr.zoom(_.lf)
       val alters = pr.zoom(_.alternatives)
 
-      val graphInfos = pr.zoom(_.graphInfos)
+      val graphInfos = pr.zoom(_.taskInfos)
 
       val maxX = if (p.proxy().lf.exists(_.graphViz.edges.nonEmpty))
         p.proxy().lf.head.graphViz.edges.maxBy(_._2.value.labelLoc.topLeft.x)._2.value.labelLoc.topLeft.x + 400
@@ -370,7 +370,14 @@ object Editor {
                     )
                   )
                 }
-                else List(<.h6("Select a Node or an Edge"))
+                else {
+                  if(s.selectedTask.isDefined && graphInfos().isReady)
+                    List(CommentComp(
+                      graphInfos().head.find(_.id == s.selectedTask.get).get.comments,
+                      newComment = (st) => pr.dispatch(AddComment(s.selectedTask.get, st))
+                    ))
+                  else List(<.h5("Select a Node or an Edge"))
+                }
               }
               )
             )

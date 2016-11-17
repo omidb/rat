@@ -9,6 +9,7 @@ import japgolly.scalajs.react.vdom.prefix_<^._
 object Icon {
   type Icon = ReactNode
   def apply(name: String): Icon = <.i(^.className := s"fa fa-$name")
+  def empty: Icon = <.div()
 
   def refreshAnimate:Icon = <.i(^.className := "fa fa-refresh fa-spin")
   def spinnerAnimate:Icon = <.i(^.className := "fa fa-spinner fa-pulse")

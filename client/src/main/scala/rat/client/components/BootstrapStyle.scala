@@ -10,6 +10,8 @@ class BootstrapStyles(implicit r: mutable.Register) extends StyleSheet.Inline()(
 
   val csDomain = Domain.ofValues(default, primary, success, info, warning, danger)
 
+  val btDomain = Domain.ofValues(default, primary, secondary, success, info, warning, danger)
+
   val contextDomain = Domain.ofValues(success, info, warning, danger)
 
   def commonStyle[A](domain: Domain[A], base: String) = styleF(domain)(opt =>
@@ -23,9 +25,9 @@ class BootstrapStyles(implicit r: mutable.Register) extends StyleSheet.Inline()(
   def styleWrap(classNames: String*) = style(addClassNames(classNames: _*))
 
 
-  val buttonOpt = commonStyle(csDomain, "btn")
+  val buttonOpt = commonStyle(btDomain, "btn")
 
-  val buttonOutlineOpt = newStyle(csDomain, "btn", "outline")
+  val buttonOutlineOpt = newStyle(btDomain, "btn", "outline")
 
   val buttonListOpt = commonStyle(csDomain, "btn")
 

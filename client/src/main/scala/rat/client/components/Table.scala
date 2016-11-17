@@ -1,46 +1,58 @@
-//package rat.client.components
-//
-//import japgolly.scalajs.react._
-//import japgolly.scalajs.react.vdom.prefix_<^._
-//import rat.client.components.Bootstrap.CommonStyle
-//import scalacss.ScalaCssReact._
-//
-//
-//object Table {
-//
-//  @inline private def bss = GlobalStyles.bootstrapStyles
-//
-//  case class State(strValue: String, editMode: Boolean = false)
-//  case class TableHeading(items:List[(Reac)])
-//  case class Props(onSave: (String) => Callback, value: String, style: CommonStyle.Value)
-//
-//  class Backend($: BackendScope[Props, State]) {
-//
-//    def onChange(e: ReactEventI) = $.setState(State(e.currentTarget.value, editMode = true))
-//    def onSave() = {
-//      val dispatchAction = $.props.flatMap(x => x.onSave($.state.runNow().strValue))
-//      dispatchAction >> $.modState(_.copy(editMode = false))
-//    }
-//
-//
-//    def render(state: State, props: Props) = {
-//      if(state.editMode)
-//        <.div(^.className := "input-group",
-//          <.input(^.`type` := "text", ^.className := "form-control", ^.placeholder := "insert something",
-//            ^.defaultValue := props.value, ^.onChange ==> onChange),
-//          <.span(^.className := "input-group-btn",
-//            <.button(^.className := "btn btn-success", ^.`type` := "button",
-//              ^.onClick --> onSave, Icon.check))
-//        )
-//      else
-//        <.div(bss.labelOpt(props.style), ^.onClick --> $.modState(_.copy(editMode = true)), props.value)
-//    }
-//  }
-//  val component = ReactComponentB[Props]("EditableText")
-//    .initialState_P(p => State(p.value))
-//    .renderBackend[Backend]
-//    .build
-//
-//  def apply(onSave: (String) => Callback, value: String, style: CommonStyle.Value = CommonStyle.default) =
-//    component(Props(onSave, value, style))
-//}
+package rat.client.components
+
+import japgolly.scalajs.react._
+import japgolly.scalajs.react.vdom.prefix_<^._
+import rat.client.components.Bootstrap.CommonStyle
+import scalacss.ScalaCssReact._
+
+
+object Table {
+
+  @inline private def bss = GlobalStyles.bootstrapStyles
+
+  // if ascending ^ otherwise downward
+
+  case class TableHeadingItem(label:String, isAscending:Boolean, isDescending:Boolean, onClick:Callback)
+  case class TableHeading(items: List[TableHeadingItem])
+
+  case class TableItem(items: List[List[ReactNode]])
+
+  case class Props(tableHeading: TableHeading, tableItems: List[TableItem])
+
+  class Backend($: BackendScope[Props, Unit]) {
+
+
+    def render(props: Props) = {
+
+      <.table(^.className := "table table-striped table-sm",
+        <.thead(
+          <.tr(
+            props.tableHeading.items.zipWithIndex.map { case (th, ind) =>
+              val caret =
+                if (th.isAscending)
+                  Icon.caretUp
+                else if(th.isDescending)
+                  Icon.caretDown
+                else Icon.empty
+                <.th(^.textAlign:= "center", th.label + " ", caret, ^.onClick --> th.onClick)
+            }
+          )
+        ),
+        <.tbody(
+          for (row <- props.tableItems) yield
+            <.tr(
+              row.items.map(item => <.td(^.textAlign:= "center", item))
+            )
+        )
+      )
+    }
+  }
+
+  val component = ReactComponentB[Props]("EditableText")
+    .stateless
+    .renderBackend[Backend]
+    .build
+
+  def apply(tableHeading: TableHeading, tableItems: List[TableItem]) =
+    component(Props(tableHeading, tableItems))
+}

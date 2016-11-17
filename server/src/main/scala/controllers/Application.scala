@@ -7,7 +7,7 @@ import com.google.inject.Inject
 import play.api.{Configuration, Environment}
 import play.api.mvc._
 import rat.shared.Api2
-import services.ApiService
+import services.{ApiService, DB}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -18,6 +18,7 @@ object Router extends autowire.Server[ByteBuffer, Pickler, Pickler] {
 
 class Application @Inject() (implicit val config: Configuration, env: Environment) extends Controller {
   val apiService = new ApiService()
+  DB.init()
 
   def index = Action {
     Ok(views.html.index("RocNLP"))

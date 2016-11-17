@@ -1,6 +1,5 @@
 package services
 
-import dgraph.DGraph
 import rat.shared._
 import com.github.omidb.nlp.toolsInterface.{TripsLF, TripsOnline, TripsServers}
 class ApiService  extends Api2{
@@ -12,7 +11,6 @@ class ApiService  extends Api2{
   }
 
   override def getAnnotationStats(user: User): AnnotationStatistics = {
-//    Thread.sleep(1500)
     AnnotationStatistics(5, 100, 10, 100)
   }
 
@@ -20,33 +18,48 @@ class ApiService  extends Api2{
 
   }
 
-  override def getUserTasks(user: User): Option[List[GraphInfo]] = {
-    Some(
-      List(
-        GraphInfo(10, "I am going to go togo to schoool of my choice and after that may be I will eat", UnEdited),
-        GraphInfo(235, "I am going to go togo to schoool of my choice and after that may be I will eat", Edited)
-      )
-    )
+  override def getUserTasks(user: User): Option[List[TaskInfo]] = {
+    println(user)
+    Some(DB.db.tasks.filter(_.userStat.exists(_._1.id == user.id)))
   }
 
   override def getUserGraph(user: User, id: Int): Option[TripsLF] = {
-    val onlineParser = new TripsOnline()
-    Some(TripsHelper.doc2lf(onlineParser.onlineParse(TripsServers.stepDev, "I have a good school")))
+    DB.db.graphs.find(x => x._1._1.id == user.id && x._1._2 == id).map(_._2)
   }
 
   override def getNodeAlters(value:String): Option[List[NodeAlternative]] = {
-    println("HEloo I am here!!")
-    Some(
-      List(
-        NodeAlternative("1", "foo", "bar", List("a1", "a2", "a3", "a4"), isWordNetMapping = false, version = "0"),
-        NodeAlternative("2", "foo1", "bar1", List("a11", "a12", "a13", "a14"), isWordNetMapping = false, version = "0"),
-        NodeAlternative("3", "foo2", "bar2", List("a21", "a22", "a23", "a24"), isWordNetMapping = false, version = "0")
-
-    ))
+    Some(AlternativeManager.getAllSenses(value))
   }
 
   override def getEdgeAlters(value:String): Option[List[EdgeAlternative]] = {
     Some(List(EdgeAlternative("1", "EdgeAlter1"), EdgeAlternative("2", "EdgeAlter2")))
+  }
+
+
+  override def getAllTasks(user: User): Option[List[TaskInfo]] = {
+    Some(DB.db.tasks)
+  }
+
+  override def deleteTask(user:User, taskID:Int): ResultStatus = {
+    DB.db.copy(tasks = DB.db.tasks.filterNot(_.id == taskID))
+    SuccessResult
+  }
+
+  override def goldTask(user:User, taskID:Int): ResultStatus = {
+    DB.db.copy(
+      golds = Gold(taskID, DB.db.tasks.find(_.id == taskID).get.sentence, DB.db.graphs.head._2) :: DB.db.golds,
+      tasks = DB.db.tasks.filterNot(_.id == taskID),
+      graphs = DB.db.graphs.filterNot(_._1._2 == taskID)
+    )
+    SuccessResult
+  }
+
+  override def submitTask(user:User, taskID:Int): ResultStatus = {
+    SuccessResult
+  }
+
+  override def getTask(user:User, taskID:Int): Map[User, TripsLF] =  {
+    DB.db.graphs.filter(_._1._2 == taskID).map(x => x._1._1 -> x._2)
   }
 
 }

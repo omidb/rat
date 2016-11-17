@@ -54,13 +54,20 @@ case class EdgeAlternative(id:String, value:String)
 //
 sealed trait GraphStatus
 
-case object Edited extends GraphStatus
-
 case object Submitted extends GraphStatus
 
 case object UnEdited extends GraphStatus
 
 case object Impossible extends GraphStatus
+
+
+sealed trait ResultStatus
+
+case object SuccessResult extends ResultStatus
+
+case object FailResult extends ResultStatus
+
+
 //
 //case class SGraphProps(id:String, sentence:String, checkLater:Boolean = false, status: GraphStatus = UnEdited,
 //                       props:Map[String,String] = Map.empty)

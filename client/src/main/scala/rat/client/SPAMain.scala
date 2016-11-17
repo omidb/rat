@@ -26,12 +26,14 @@ object SPAMain extends js.JSApp {
   case object LoginLoc extends Loc
   case object EditorLoc extends Loc
   case object TasksLoc extends Loc
+  case object GoldsLoc extends Loc
 
 
   val loginWrapper = MainCircuit.connect(_.user)
   val dashboardWrapper = MainCircuit.connect(x => x.statistics)
   val editorWrapper = MainCircuit.connect(x => x.editorHelper)
   val tasksWrapper = MainCircuit.connect(x => x.taskHelper)
+  val goldsWrapper = MainCircuit.connect(x => x.goldHelper)
 
   def getRouter(userValid:CallbackB) = {
     RouterConfigDsl[Loc].buildConfig { dsl =>
@@ -41,7 +43,7 @@ object SPAMain extends js.JSApp {
         (staticRoute(root, DashboardLoc) ~> renderR(ctl => dashboardWrapper(proxy => Dashboard(proxy)))
          | staticRoute("#editor", EditorLoc) ~> renderR(ctl => editorWrapper(proxy => Editor(proxy)))
          | staticRoute("#tasks", TasksLoc) ~> renderR(ctl => tasksWrapper(proxy => TaskViewer(proxy)))
-//        (staticRoute(root, DashboardLoc) ~> renderR(ctl => dashboardCOmp())
+          | staticRoute("#golds", GoldsLoc) ~> renderR(ctl => goldsWrapper(proxy => GoldViewer(proxy)))
           ).addCondition(userValid)(_ => redirectToPage(LoginLoc)(Redirect.Push))
 
       (staticRoute("#login", LoginLoc) ~> renderR(ctl => loginWrapper(proxy => Login(proxy, ctl)))

@@ -24,9 +24,15 @@ trait Api2 {
 
   def getUserGraph(user: User, id:Int): Option[TripsLF]
 
+  def getAllGolds(user: User): Option[List[GoldInfo]]
+
+  def getGold(taskID:Int): TripsLF
+
   def getNodeAlters(value:String): Option[List[NodeAlternative]]
 
   def getEdgeAlters(value:String): Option[List[EdgeAlternative]]
+
+  def searchGolds(search:String): Option[List[GoldInfo]]
 
 
 

@@ -70,7 +70,8 @@ object Settings {
 //    "org.webjars.bower" % "bootstrap" % versions.bootstrap exclude("org.webjars", "jquery"), //% Provided,
     "com.lihaoyi" %% "utest" % versions.uTest % Test,
     "org.xerial" % "sqlite-jdbc" % versions.quill_jdbc,
-    "io.getquill" %% "quill-jdbc" % versions.quill
+    "io.getquill" %% "quill-jdbc" % versions.quill,
+    "com.github.mrmechko" %% "strips2" % "0.0.1-SNAPSHOT"
   ))
 
   /** Dependencies only used by the JS project (note the use of %%% instead of %%) */

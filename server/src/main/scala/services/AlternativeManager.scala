@@ -3,6 +3,8 @@ package services
 
 import java.io.FileWriter
 import java.nio.ByteBuffer
+import java.nio.file.Files
+
 import rat.shared._
 
 import scala.collection.TraversableLike
@@ -15,14 +17,20 @@ object AlternativeManager {
   import strips.lexicon._
   import strips.util.LexiconFromXML
 
-  val ontPath = "ont.bin"
-  val lexPath = "lex.bin"
+  val ontPath = "./ont.bin"
+  val lexPath = "./lex.bin"
+
+  println(new java.io.File(".").getAbsolutePath)
+  println("Staring to load Trips Lexicon")
 
   val ont = if (new java.io.File(ontPath).exists) {
+    println("exist")
     val data = scala.io.Source.fromFile(ontPath).getLines().toList.mkString
     upickle.default.read[SOntology](data)
   } else {
+    println("doesn't exist")
     val data = SOntology(OntologyFromXML("./flaming-tyrion/lexicon/data/"))
+    println("didn't pass")
     val s = upickle.default.write(data)
     SimpleWriter.write(s, ontPath)
     data
@@ -31,6 +39,7 @@ object AlternativeManager {
     val data = scala.io.Source.fromFile(lexPath).getLines().toList.mkString
     upickle.default.read[TripsLexicon](data)
   } else {
+
     val data = TripsLexicon(LexiconFromXML("./flaming-tyrion/lexicon/data/"))
     val s = upickle.default.write(data)
     SimpleWriter.write(s, lexPath)

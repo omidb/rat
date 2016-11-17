@@ -62,7 +62,7 @@ object Bootstrap {
     case class ButtonItem(content: ReactNode, onClick: Callback,
                           active: Boolean = false, addStyles: Seq[StyleA] = Seq())
 
-    case class Props(items: List[ButtonItem])
+    case class Props(items: List[ButtonItem], ellipsis:Boolean= true)
 
     val component = ReactComponentB[Props]("ButtonList")
       .render_P(p =>
@@ -80,15 +80,15 @@ object Bootstrap {
                 ^.className := s"list-group-item list-group-item-action",
               item.addStyles,
               ^.tpe := "button",
-              ^.whiteSpace := "nowrap",
-              ^.overflow := "hidden",
-              ^.textOverflow := "ellipsis",
+              p.ellipsis ?= (^.whiteSpace := "nowrap"),
+              p.ellipsis ?= (^.overflow := "hidden"),
+                p.ellipsis ?= (^.textOverflow := "ellipsis"),
               ^.onClick --> item.onClick, item.content)
           )
         )
       ).build
 
-    def apply(items:List[ButtonItem]) = component(Props(items))
+    def apply(items:List[ButtonItem], ellipsis:Boolean= true) = component(Props(items, ellipsis))
 
     def apply() = component
   }

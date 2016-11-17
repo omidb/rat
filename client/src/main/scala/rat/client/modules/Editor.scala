@@ -321,7 +321,8 @@ object Editor {
                           ButtonList(
                             altrs.map(al =>
                               ButtonList.ButtonItem(
-                                <.div(BTag("doob", style = CommonStyle.info), " asdas"),
+                                <.div(BTag(al.typ, style = if(al.isWordNetMapping) CommonStyle.info else CommonStyle.info),
+                                  <.p(al.path2root.mkString(">"), ^.fontSize:="12px")),
                                 active = al.typ == lf.graphViz.nodes(pr().selectState.isNode.get).value.value.getOrElse("type", "-"),
                                 onClick = pr.dispatch(
                                   ActionBatch(
@@ -331,7 +332,8 @@ object Editor {
                                   )
                                 )
                               )
-                            )
+                            ),
+                            ellipsis = false
                           )
                         )
                       )

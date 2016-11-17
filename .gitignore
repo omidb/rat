@@ -26,7 +26,7 @@ project/plugins/project/
 *.iml
 out
 *.sc
-
+flaming-tyrion/
 # GitBook
 doc/_book
 /_book

@@ -70,13 +70,65 @@ case class GoldResult(res:ResultStatus) extends Action
 case class GetTaskGraphs(id:Int) extends Action
 case class UpdateTask(lfs: Map[User, TripsLFViz]) extends Action
 
+//Golds Actions
+case object GetAllGolds extends Action
+case class UpdateAllGolds(tasks:Option[List[GoldInfo]]) extends Action
+case class GetGoldGraphs(id:Int) extends Action
+case class UpdateGoldGraph(lfs: TripsLFViz) extends Action
+case class SearchGold(str:String) extends Action
+
 
 case class TaskViewerHelper(tasks:Pot[List[TaskInfo]], deleteRes:Pot[ResultStatus],
                             goldRes:Pot[ResultStatus], graphs:Pot[Map[User,TripsLFViz]])
 
+case class GoldViewerHelper(golds:Pot[List[GoldInfo]], rollbackRes:Pot[ResultStatus],
+                            parseRes:Pot[ResultStatus], graph:Pot[TripsLFViz])
+
 // The base model of our application
 case class RootModel(user: Pot[User], statistics: Pot[AnnotationStatistics], editorHelper: EditorHelper,
-                     taskHelper:TaskViewerHelper)
+                     taskHelper:TaskViewerHelper, goldHelper:GoldViewerHelper)
+
+
+class GoldHandler[M](modelRW: ModelRW[M, GoldViewerHelper], user:User) extends ActionHandler(modelRW){
+  override def handle = {
+    case GetAllGolds =>
+      updated(modelRW().modify(_.golds).setTo(modelRW().golds.pending()),
+        Effect(
+          AjaxClient[Api2].getAllGolds(user).call().map(golds =>
+            UpdateAllGolds(golds.map(t => t.sortBy(_.id)))
+          )
+        )
+      )
+
+    case UpdateAllGolds(golds) =>
+      if(golds.isDefined)
+        updated(modelRW().modify(_.golds).setTo(Ready(golds.get)))
+      else
+        updated(modelRW().modify(_.golds).setTo(modelRW().golds.unavailable()))
+
+
+    case GetGoldGraphs(taskID) =>
+      updated(modelRW().modify(_.graph).setTo(modelRW().graph.pending()),
+        Effect(
+          AjaxClient[Api2].getGold(taskID).call().map(gld =>  {
+            UpdateGoldGraph(GraphUtil.layoutGraph(gld))
+          })
+        )
+      )
+
+    case UpdateGoldGraph(lfs) => updated(modelRW().modify(_.graph).setTo(Ready(lfs)))
+
+    case SearchGold(str) =>
+      updated(modelRW().modify(_.golds).setTo(modelRW().golds.pending()),
+        Effect(
+          AjaxClient[Api2].searchGolds(str).call().map(golds =>
+            UpdateAllGolds(golds.map(t => t.sortBy(_.id)))
+          )
+        )
+      )
+
+  }
+}
 
 
 class TasksHandler[M](modelRW: ModelRW[M, TaskViewerHelper], user:User) extends ActionHandler(modelRW){
@@ -429,7 +481,7 @@ object MainCircuit extends Circuit[RootModel] with ReactConnector[RootModel] {
   override protected def initialModel = RootModel(Empty, Empty,
     EditorHelper(User.invalidUser,
       Empty, Empty, None, SelectState(None, None),Alternatives(Empty, Empty), UndoManager(List.empty)
-    ), TaskViewerHelper(Empty,Empty,Empty, Empty)
+    ), TaskViewerHelper(Empty,Empty,Empty, Empty), GoldViewerHelper(Empty, Empty,Empty,Empty)
   )
 
   // combine all handlers into one
@@ -442,6 +494,9 @@ object MainCircuit extends Circuit[RootModel] with ReactConnector[RootModel] {
       userP = zoomRW(_.user)((x1,x2) => x2)*/),
 
     new TasksHandler(zoomRW(_.taskHelper)((m, u) => m.copy(taskHelper = u)),
+      user = zoom(_.user.headOption.getOrElse(User.invalidUser)).value),
+
+    new GoldHandler(zoomRW(_.goldHelper)((m, u) => m.copy(goldHelper = u)),
       user = zoom(_.user.headOption.getOrElse(User.invalidUser)).value)
   )
 }

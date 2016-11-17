@@ -1,5 +1,6 @@
 package services
 
+import com.github.omidb.nlp.formats.SExpression
 import rat.shared._
 import com.github.omidb.nlp.toolsInterface.{TripsLF, TripsOnline, TripsServers}
 class ApiService  extends Api2{
@@ -60,6 +61,21 @@ class ApiService  extends Api2{
 
   override def getTask(user:User, taskID:Int): Map[User, TripsLF] =  {
     DB.db.graphs.filter(_._1._2 == taskID).map(x => x._1._1 -> x._2)
+  }
+
+  override def getAllGolds(user: User): Option[List[GoldInfo]] = {
+    Some(DB.db.goldsInfo)
+  }
+
+  override def getGold(taskID:Int): TripsLF = {
+    DB.db.golds.find(_.id == taskID).get.graph
+  }
+
+  override def searchGolds(search:String): Option[List[GoldInfo]] = {
+    val res = SExpression.parse(search)
+    res.map(s =>
+      DB.search(s)
+    )
   }
 
 }

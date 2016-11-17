@@ -3,6 +3,7 @@ package controllers
 import java.nio.ByteBuffer
 
 import boopickle.Default._
+import com.github.omidb.nlp.formats.SExpression
 import com.google.inject.Inject
 import play.api.{Configuration, Environment}
 import play.api.mvc._
@@ -19,6 +20,7 @@ object Router extends autowire.Server[ByteBuffer, Pickler, Pickler] {
 class Application @Inject() (implicit val config: Configuration, env: Environment) extends Controller {
   val apiService = new ApiService()
   DB.init()
+
 
   def index = Action {
     Ok(views.html.index("RocNLP"))

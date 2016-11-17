@@ -4,7 +4,7 @@ import diode.react.ModelProxy
 import japgolly.scalajs.react._
 import japgolly.scalajs.react.extra.router.RouterCtl
 import japgolly.scalajs.react.vdom.prefix_<^._
-import rat.client.SPAMain.{DashboardLoc, EditorLoc, Loc, TasksLoc}
+import rat.client.SPAMain._
 import rat.client.components.Bootstrap.CommonStyle
 import rat.client.components.Icon._
 import rat.client.components._
@@ -31,7 +31,8 @@ object MainMenu {
   private val menuItems = Seq(
     MenuItem(1, _ => "Dashboard", Icon.dashboard, DashboardLoc),
     MenuItem(2, p => buildGrEditMenu(p), Icon.scissors, EditorLoc),
-    MenuItem(3, p => "Tasks", Icon.barChart, TasksLoc)
+    MenuItem(3, p => "Tasks", Icon.barChart, TasksLoc),
+    MenuItem(4, p => "Golds", Icon.diamond, GoldsLoc)
   )
 
   private class Backend($: BackendScope[Props, Unit]) {

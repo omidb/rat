@@ -26,6 +26,8 @@ import scalacss.ScalaCssReact._
 import scalacss.Defaults._
 import Table.{TableHeading, TableHeadingItem, TableItem}
 
+import scala.scalajs.js.URIUtils
+
 object GoldViewer {
 
   @inline private def bss = GlobalStyles.bootstrapStyles
@@ -33,32 +35,72 @@ object GoldViewer {
   case class Props(proxy: ModelProxy[GoldViewerHelper])
 
   case class State(columnID: Int, isAscending: Boolean, deleteCheck: Boolean,
-                   zoomSize:Double, selectedTask:Option[Int], searchStr:String = "")
+                   zoomSize:Double, selectedTask:Option[Int], searchStr:String = "", lisp:Option[String] = None)
 
   class Backend($: BackendScope[Props, State]) extends OnUnmount {
 
-    def rev(tsk:List[GoldInfo], rev:Boolean) = if(rev) tsk.reverse else tsk
+    def rev(tsk:List[TaskInfo], rev:Boolean) = if(rev) tsk.reverse else tsk
 
     def onChange(e: ReactEventI) = {
       val tv = e.currentTarget.value
       $.modState(_.copy(searchStr= tv))
     }
 
+
     def render(s: State, p: Props) = {
       val tasksPot = p.proxy.zoom(_.golds)
       val grs = p.proxy.zoom(_.graph)
+      val lisp = p.proxy.zoom(_.lisp)
       <.div(
         <.div(^.className := "row",
-          <.div(^.className := "col-sm-12",
+          <.div(^.className := "col-sm-6",
             <.form(
               <.div(^.className:="form-group",
                 <.label(^.`for`:="exampleTextarea", "Search"),
                 <.textarea(^.className:="form-control", ^.id:="exampleTextarea", ^.rows:="3", ^.onChange ==> onChange)
               ),
-              <.button(^.`type`:="submit", ^.className:="btn btn-primary", "Search",
-                ^.onClick --> p.proxy.dispatch(SearchGold(s.searchStr)))
+              <.div(^.className:="row",
+                <.div(^.className:="col-sm-4",
+                  <.button(^.`type`:="submit", ^.className:="btn btn-primary", "Search",
+                    ^.onClick --> p.proxy.dispatch(SearchGold(s.searchStr)))
+                ),
+                <.div(^.className:="col-sm-4",
+                    OButton(
+                      OButton.Props(
+                        if(tasksPot().isReady)
+                          p.proxy.dispatch(GetLispForGolds(tasksPot().get.map(_.id)))
+                        else Callback.empty,
+                        style = CommonStyle.success
+                      ), "To Lisp"
+                    )
+                ),
+                <.div(^.className:="col-sm-4",
+                  lisp().renderEmpty(""),
+                  lisp().renderPending(_ => <.div(^.textAlign := "center", Icon.spinnerAnimate)),
+                  lisp().renderFailed(ex => "Faild"),
+                  lisp().renderReady(lsp =>
+                    <.a(^.download := "golds.lisp", ^.href := "data:application/octet-stream;charset=utf-8," +
+                    URIUtils.encodeURIComponent(lsp), "download"))
+                )
+              )
             )
-          )
+          )//,
+//          if(p.proxy.zoom(_.user).apply().access == "all")
+//            <.div(^.className := "col-sm-6",
+//              <.form(
+//                <.div(^.className:="form-group",
+//                  <.label(^.`for`:="exampleTextarea", "Search"),
+//                  <.textarea(^.className:="form-control", ^.id:="exampleTextarea", ^.rows:="3", ^.onChange ==> onChange)
+//                ),
+//                <.div(^.className:="row",
+//                  <.div(^.className:="col-sm-4",
+//                    <.button(^.`type`:="submit", ^.className:="btn btn-primary", "Search",
+//                      ^.onClick --> p.proxy.dispatch(SearchGold(s.searchStr)))
+//                  )
+//                )
+//              )
+//            )
+//          else <.div()
         ),
         <.div(^.className := "row",
           <.div(^.className := "col-sm-12",
@@ -81,7 +123,8 @@ object GoldViewer {
                         $.modState(_.copy(isAscending = !s.isAscending, columnID = 0))),
                       TableHeadingItem("Sentence", s.columnID == 1 && s.isAscending, s.columnID == 1 && !s.isAscending,
                         $.modState(_.copy(isAscending = !s.isAscending, columnID = 1))),
-                      TableHeadingItem("Users", s.columnID == 2 && s.isAscending, s.columnID == 2 && !s.isAscending, Callback.empty),
+                      TableHeadingItem("Users", s.columnID == 2 && s.isAscending, s.columnID == 2 && !s.isAscending,
+                        Callback.empty),
                       TableHeadingItem("Tools", s.columnID == 4 && s.isAscending, s.columnID == 4 && !s.isAscending,
                         Callback.empty)
                     )),
@@ -91,9 +134,9 @@ object GoldViewer {
                         List(t.id),
                         List(t.sentence),
                         t.userStat.toList.map {
-                          case (u, Impossible) => BTag(u.id, style = CommonStyle.warning)
-                          case (u, Submitted) => BTag(u.id, style = CommonStyle.info)
-                          case (u, UnEdited) => BTag(u.id, style = CommonStyle.danger)
+                          case (u, Impossible) => BTag(u, style = CommonStyle.warning)
+                          case (u, Submitted) => BTag(u, style = CommonStyle.info)
+                          case (u, UnEdited) => BTag(u, style = CommonStyle.danger)
                         },
                         List(
                           OButton(OButton.Props(
@@ -102,11 +145,13 @@ object GoldViewer {
                             onClick = p.proxy.dispatch(GetGoldGraphs(t.id)) >>
                               $.modState(_.copy(selectedTask = Some(t.id)))), "Select"),
 
-                          OButton(OButton.Props(
-                            addStyles = Seq(bss.pullRight, bss.buttonXS),
-                            style = CommonStyle.danger,
-                            onClick = p.proxy.dispatch(DeleteTask(t.id))
-                          ), "Rollback")
+                          if(p.proxy.zoom(_.user).apply().access == "all")
+                            OButton(OButton.Props(
+                              addStyles = Seq(bss.pullRight, bss.buttonXS),
+                              style = CommonStyle.danger,
+                              onClick = p.proxy.dispatch(RollbackGold(t.id))
+                            ), "Rollback")
+                          else <.div()
                         )
                       )
                     )

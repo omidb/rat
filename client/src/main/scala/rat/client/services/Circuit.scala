@@ -19,8 +19,11 @@ import scala.scalajs.concurrent.JSExecutionContext.Implicits.queue
 case class SignIn(username: UserName) extends Action
 
 case class UpdateUser(user: User) extends Action
+case class UpdateUser2(user: User) extends Action
 case class UpdateUserG(user: User) extends Action
 case class UpdateUserT(user: User) extends Action
+case class UpdateUserGold(user: User) extends Action
+case class UpdateUserStat(user: User) extends Action
 
 case object CalculateAgreement extends Action
 
@@ -48,6 +51,17 @@ case object GetUserTasks extends Action
 case class UpdateUserTasks(tasks:Option[List[TaskInfo]]) extends Action
 case class GetUserGraph(id:Int) extends Action
 case class UpdateEditorGraph(lf:Option[TripsLF]) extends Action
+case class SaveEditedGraph(id:Int) extends Action
+case class UpdateSaveResult(res:ResultStatus) extends Action
+
+case class UpdateSelectedTask(id:Option[Int]) extends Action
+case class UpdateSelectedLastTask(id:Option[Int]) extends Action
+
+//golds in Graph
+case class SaveEditedGold(id:Int) extends Action
+case object GetGoldsForEdit extends Action
+case class GetGoldGraphForEdit(taskID:Int) extends Action
+//
 
 case class SearchAlterNode(value: String) extends Action
 case class SearchAlterEdge(value: String) extends Action
@@ -56,6 +70,7 @@ case class UpdateNodeAlters(nodes: Option[List[NodeAlternative]]) extends Action
 case class UpdateEdgeAlters(edges: Option[List[EdgeAlternative]]) extends Action
 
 object UndoAction extends Action
+object ClearUndo extends Action
 case class PushAction(action:Action) extends Action
 case object EnableUndo extends Action
 case object DisableUndo extends Action
@@ -72,29 +87,105 @@ case class UpdateTask(lfs: Map[User, TripsLFViz]) extends Action
 
 //Golds Actions
 case object GetAllGolds extends Action
-case class UpdateAllGolds(tasks:Option[List[GoldInfo]]) extends Action
+case class UpdateAllGolds(tasks:Option[List[TaskInfo]]) extends Action
 case class GetGoldGraphs(id:Int) extends Action
-case class UpdateGoldGraph(lfs: TripsLFViz) extends Action
+case class UpdateGoldGraph(lfs: Option[TripsLFViz]) extends Action
 case class SearchGold(str:String) extends Action
+case class GetLispForGolds(ids:List[Int]) extends Action
+case class UpdateLisp(lisp:String) extends Action
+case class RollbackGold(goldID:Int) extends Action
+case class UpdateRollbackResult(res:ResultStatus) extends Action
+
+//Evaluation Actions
+case object GetAllGoldsForEvaluation extends Action
+case class UpdateAllGoldsForEvaluation(tasks:Option[Map[String, List[TaskInfo]]]) extends Action
+case class EvaluateGold(id:Int) extends Action
+case class UpdateEvalGold(id:Int, value:Double) extends Action
+case class RecursiveEvaluate(ids:List[Int], currentID:Int) extends Action
 
 
 case class TaskViewerHelper(tasks:Pot[List[TaskInfo]], deleteRes:Pot[ResultStatus],
-                            goldRes:Pot[ResultStatus], graphs:Pot[Map[User,TripsLFViz]])
+                            goldRes:Pot[ResultStatus], graphs:Pot[Map[User,TripsLFViz]], user:User = User.invalidUser)
 
-case class GoldViewerHelper(golds:Pot[List[GoldInfo]], rollbackRes:Pot[ResultStatus],
-                            parseRes:Pot[ResultStatus], graph:Pot[TripsLFViz])
+case class GoldViewerHelper(golds:Pot[List[TaskInfo]], rollbackRes:Pot[ResultStatus],
+                            parseRes:Pot[ResultStatus], graph:Pot[TripsLFViz], lisp:Pot[String],
+                            roolbackResult:ResultStatus, user:User = User.invalidUser)
+
+case class EvaluationHelper(tasks:Pot[Map[String, List[TaskInfo]]], evalResult:Map[Int,Pot[Double]],
+                            currentID:Int = 0)
 
 // The base model of our application
-case class RootModel(user: Pot[User], statistics: Pot[AnnotationStatistics], editorHelper: EditorHelper,
-                     taskHelper:TaskViewerHelper, goldHelper:GoldViewerHelper)
+case class RootModel(user: Pot[User], statistics: StatisticHelper, editorHelper: EditorHelper,
+                     taskHelper:TaskViewerHelper, goldHelper:GoldViewerHelper, evaluationHelper: EvaluationHelper)
 
 
-class GoldHandler[M](modelRW: ModelRW[M, GoldViewerHelper], user:User) extends ActionHandler(modelRW){
+class EvaluationHandler[M](modelRW: ModelRW[M, EvaluationHelper], user:User) extends ActionHandler(modelRW) {
+  override def handle = {
+    case GetAllGoldsForEvaluation =>
+      updated(modelRW().modify(_.tasks).setTo(modelRW().tasks.pending()),
+        Effect(
+          AjaxClient[Api2].getAllDomainGold().call().map(golds => {
+            println(s"got golds ${golds.map(_.size)}")
+            UpdateAllGoldsForEvaluation(golds)
+          }
+          )
+        )
+      )
+
+    case UpdateAllGoldsForEvaluation(tasks) =>
+      if (tasks.isDefined) {
+        println(s"Updating the tasks! ${tasks.get.size}")
+        updated(modelRW().modify(_.tasks).setTo(Ready(tasks.get)))
+      }
+      else
+        updated(modelRW().modify(_.tasks).setTo(modelRW().tasks.unavailable()))
+
+    case EvaluateGold(id) =>
+      updated(
+        modelRW().modify(_.evalResult).setTo(
+          if (modelRW().evalResult.contains(id))
+            modelRW().evalResult.updated(id, modelRW().evalResult(id).pending())
+          else
+            modelRW().evalResult.updated(id, Pending())
+        ),
+        Effect(
+          AjaxClient[Api2].evalGoldID(id).call().map(res => UpdateEvalGold(id, res))
+        )
+      )
+
+    case UpdateEvalGold(id: Int, value: Double) =>
+      updated(
+        modelRW().modify(_.evalResult).setTo(
+          modelRW().evalResult.updated(id, Ready(value))
+        )
+      )
+
+    case RecursiveEvaluate(ids, index) =>
+      val id = ids(index)
+      updated(modelRW().modify(_.evalResult).setTo(
+        if (modelRW().evalResult.contains(id))
+          modelRW().evalResult.updated(id, modelRW().evalResult(id).pending())
+        else
+          modelRW().evalResult.updated(id, Pending())
+      ),
+        Effect(
+          AjaxClient[Api2].evalGoldID(id).call().map(res =>
+            if (index < ids.size)
+              ActionBatch(UpdateEvalGold(id, res), RecursiveEvaluate(ids, index + 1))
+            else
+              UpdateEvalGold(id, res)
+          )
+        )
+      )
+  }
+}
+
+class GoldHandler[M](modelRW: ModelRW[M, GoldViewerHelper]) extends ActionHandler(modelRW){
   override def handle = {
     case GetAllGolds =>
       updated(modelRW().modify(_.golds).setTo(modelRW().golds.pending()),
         Effect(
-          AjaxClient[Api2].getAllGolds(user).call().map(golds =>
+          AjaxClient[Api2].getAllGolds().call().map(golds =>
             UpdateAllGolds(golds.map(t => t.sortBy(_.id)))
           )
         )
@@ -111,12 +202,14 @@ class GoldHandler[M](modelRW: ModelRW[M, GoldViewerHelper], user:User) extends A
       updated(modelRW().modify(_.graph).setTo(modelRW().graph.pending()),
         Effect(
           AjaxClient[Api2].getGold(taskID).call().map(gld =>  {
-            UpdateGoldGraph(GraphUtil.layoutGraph(gld))
+            UpdateGoldGraph(gld.map(g => GraphUtil.layoutGraph(g)))
           })
         )
       )
 
-    case UpdateGoldGraph(lfs) => updated(modelRW().modify(_.graph).setTo(Ready(lfs)))
+    case UpdateGoldGraph(lfs) =>
+      if(lfs.isDefined) updated(modelRW().modify(_.graph).setTo(Ready(lfs.get)))
+      else updated(modelRW().modify(_.graph).setTo(modelRW().graph.unavailable()))
 
     case SearchGold(str) =>
       updated(modelRW().modify(_.golds).setTo(modelRW().golds.pending()),
@@ -127,16 +220,44 @@ class GoldHandler[M](modelRW: ModelRW[M, GoldViewerHelper], user:User) extends A
         )
       )
 
+    case GetLispForGolds(ids) =>
+      println("get Lisp")
+      updated(modelRW().modify(_.lisp).setTo(modelRW().lisp.pending()),
+        Effect(
+          AjaxClient[Api2].getLispForGolds(ids).call().map(lisp =>
+            UpdateLisp(lisp)
+          )
+        )
+      )
+
+    case UpdateLisp(lisp) =>
+      println("update Lisp")
+      updated(modelRW().modify(_.lisp).setTo(Ready(lisp)))
+
+    case RollbackGold(taskID) =>
+      updated(modelRW().modify(_.rollbackRes).setTo(modelRW().rollbackRes.pending()),
+        Effect(
+          AjaxClient[Api2].rollBack(taskID).call().map(res => UpdateRollbackResult(res))
+        )
+      )
+
+    case UpdateRollbackResult(res) =>
+      updated(modelRW().modify(_.rollbackRes).setTo(Ready(res)), Effect(Future(GetAllGolds)))
+
+
+    case UpdateUserGold(user:User) => updated(modelRW().modify(_.user).setTo(user))
+
+
   }
 }
 
 
-class TasksHandler[M](modelRW: ModelRW[M, TaskViewerHelper], user:User) extends ActionHandler(modelRW){
+class TasksHandler[M](modelRW: ModelRW[M, TaskViewerHelper]) extends ActionHandler(modelRW){
   override def handle = {
     case GetAllTasks =>
       updated(modelRW().modify(_.tasks).setTo(modelRW().tasks.pending()),
         Effect(
-          AjaxClient[Api2].getAllTasks(user).call().map(tasks =>
+          AjaxClient[Api2].getAllTasks(modelRW().user).call().map(tasks =>
             UpdateAllTasks(tasks.map(t => t.sortBy(_.id)))
           )
         )
@@ -151,25 +272,28 @@ class TasksHandler[M](modelRW: ModelRW[M, TaskViewerHelper], user:User) extends 
     case DeleteTask(taskID) =>
       updated(modelRW().modify(_.deleteRes).setTo(modelRW().deleteRes.pending()),
         Effect(
-          AjaxClient[Api2].deleteTask(user, taskID).call().map(res => DeleteResult(res))
+          AjaxClient[Api2].deleteTask(modelRW().user, taskID).call().map(res => DeleteResult(res))
         )
       )
 
     case GoldTask(taskID) =>
       updated(modelRW().modify(_.goldRes).setTo(modelRW().goldRes.pending()),
         Effect(
-          AjaxClient[Api2].goldTask(user, taskID).call().map(res => GoldResult(res))
+          AjaxClient[Api2].goldTask(modelRW().user, taskID).call().map(res => GoldResult(res))
         )
       )
 
-    case DeleteResult(res) => updated(modelRW().modify(_.deleteRes).setTo(Ready(res)))
+    case DeleteResult(res) =>
+      if(res == SuccessResult) updated(modelRW().modify(_.deleteRes).setTo(Ready(res)), Effect(Future(GetAllTasks)))
+      else updated(modelRW().modify(_.deleteRes).setTo(Ready(res)))
 
-    case GoldResult(res) => updated(modelRW().modify(_.goldRes).setTo(Ready(res)))
+
+    case GoldResult(res) => updated(modelRW().modify(_.goldRes).setTo(Ready(res)), Effect(Future(GetAllTasks)))
 
     case GetTaskGraphs(taskID) =>
       updated(modelRW().modify(_.graphs).setTo(modelRW().graphs.pending()),
         Effect(
-          AjaxClient[Api2].getTask(user, taskID).call().map(tsks =>  {
+          AjaxClient[Api2].getTask(modelRW().user, taskID).call().map(tsks =>  {
             val ts = tsks.map {case(u,t) => u -> GraphUtil.layoutGraph(t)}
             UpdateTask(ts)
           })
@@ -182,10 +306,12 @@ class TasksHandler[M](modelRW: ModelRW[M, TaskViewerHelper], user:User) extends 
       updated(
         modelRW().modify(_.tasks).setTo(modelRW().tasks.map(ti =>{
           val x = ti.partition(_.id == taskID)
-          val x1 = x._1.map(ti2 => ti2.copy(comments = Comment(user, value) :: ti2.comments)) ::: x._2
+          val x1 = x._1.map(ti2 => ti2.copy(comments = Comment(modelRW().user.id, value) :: ti2.comments)) ::: x._2
           x1.sortBy(_.id)
         }))
       )
+
+    case UpdateUserT(user:User) => updated(modelRW().modify(_.user).setTo(user))
 
   }
 }
@@ -193,22 +319,32 @@ class TasksHandler[M](modelRW: ModelRW[M, TaskViewerHelper], user:User) extends 
 class UserHandler[M](modelRW: ModelRW[M, Pot[User]]) extends ActionHandler(modelRW) {
   override def handle = {
     case SignIn(username) => effectOnly(Effect(AjaxClient[Api2].signIn(username).call().map(user => UpdateUser(user))))
-    case UpdateUser(user) => updated(Ready(user), Effect(Future(UpdateUserG(user))))
+    case UpdateUser(user) => effectOnly(
+      Effect(Future(ActionBatch(UpdateUserG(user), UpdateUserStat(user), UpdateUserT(user), UpdateUserGold(user), UpdateUser2(user))))
+    )
+
+    case UpdateUser2(user) => updated(Ready(user))
   }
 }
 
-class StatisticHandler[M](modelRW: ModelRW[M, Pot[AnnotationStatistics]], user:User) extends ActionHandler(modelRW) {
+
+case class StatisticHelper(annotationStatistics: Pot[AnnotationStatistics], user: User)
+
+class StatisticHandler[M](modelRW: ModelRW[M, StatisticHelper]) extends ActionHandler(modelRW) {
   override def handle = {
     case GetStatistics=>
-      updated(modelRW().pending(),
-        Effect(AjaxClient[Api2].getAnnotationStats(user).call().map(stats =>
+      updated(modelRW().modify(_.annotationStatistics).setTo(modelRW().annotationStatistics.pending()),
+        Effect(AjaxClient[Api2].getAnnotationStats(modelRW().user).call().map(stats =>
           UpdateStatistics(stats)
         ))
       )
 
-    case CalculateAgreement => effectOnly(Effect(AjaxClient[Api2].calculateAgreement().call().map(x => GetStatistics)))
+    case CalculateAgreement => effectOnly(Effect(AjaxClient[Api2].calculateAgreement(modelRW().user).call()
+      .map(x => GetStatistics)))
 
-    case UpdateStatistics(stats) => updated(Ready(stats))
+    case UpdateStatistics(stats) => updated(modelRW().modify(_.annotationStatistics).setTo(Ready(stats)))
+
+    case UpdateUserStat(user:User) => updated(modelRW().modify(_.user).setTo(user))
   }
 }
 
@@ -219,12 +355,24 @@ case class Alternatives(edgeAlters: Pot[List[EdgeAlternative]], nodeAlters:Pot[L
 case class UndoManager(actionStack:List[Action], undoEnable:Boolean = true)
 case class EditorHelper(user: User, lf:Pot[TripsLFViz], taskInfos:Pot[List[TaskInfo]],
                         dragState:Option[DragState], selectState:SelectState,
-                        alternatives: Alternatives, undoManager: UndoManager)
+                        alternatives: Alternatives, undoManager: UndoManager, saveResult:ResultStatus,
+                        selectedTask: Option[Int] = None, lastSelectedTask: Option[Int] = None
+                       )
 
 
 class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(modelRW) {
   override def handle = {
-    //val user = userP.headOption.getOrElse(User.invalidUser)
+
+    case UpdateSelectedLastTask(id) =>
+      updated(
+        modelRW().modify(_.lastSelectedTask).setTo(id)
+      )
+
+    case UpdateSelectedTask(id) =>
+      updated(
+        modelRW().modify(_.selectedTask).setTo(id)
+      )
+
     case UpdateUserG(user) => updated(modelRW().modify(_.user).setTo(user))
 
     case EdgeEndAction(isEnter, isStart, id) =>
@@ -383,6 +531,16 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(m
         )
       )
 
+    case GetGoldsForEdit =>
+      println(modelRW().user)
+      updated(modelRW().copy(taskInfos = modelRW().taskInfos.pending()),
+        Effect(
+          AjaxClient[Api2].getAllGolds().call().map(golds =>
+            UpdateUserTasks(golds)
+          )
+        )
+      )
+
     case UpdateUserTasks(tasks) =>
       if (tasks.isDefined)
         updated(modelRW().copy(taskInfos = Ready(tasks.get)))
@@ -390,11 +548,20 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(m
         updated(modelRW().copy(taskInfos = modelRW().taskInfos.unavailable()))
 
     case GetUserGraph(id) =>
+      println(s"Get graph $id")
       updated(modelRW().copy(lf = modelRW().lf.pending()),
         Effect(
           AjaxClient[Api2].getUserGraph(modelRW().user, id).call().map(lf =>
             UpdateEditorGraph(lf)
           )
+        )
+      )
+
+    case GetGoldGraphForEdit(id) =>
+      println(s"Get gold $id")
+      updated(modelRW().copy(lf = modelRW().lf.pending()),
+        Effect(
+          AjaxClient[Api2].getGold(id).call().map(lf => UpdateEditorGraph(lf))
         )
       )
 
@@ -404,10 +571,23 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(m
       else
         updated(modelRW().copy(lf = modelRW().lf.unavailable()))
 
+      case SaveEditedGraph(id) =>
+        println(s"save $id")
+        println(GraphUtil.tripsLFViz2tripsLF(modelRW().lf.get))
+        effectOnly(Effect(AjaxClient[Api2].saveTask(modelRW().user, id,
+          GraphUtil.tripsLFViz2tripsLF(modelRW().lf.get)).call()
+          .map(res => UpdateSaveResult(res))))
+      //golds in Graph
+      case SaveEditedGold(id) =>
+        println(s"save gold $id")
+        effectOnly(Effect(AjaxClient[Api2].saveGold(modelRW().user, id,
+          GraphUtil.tripsLFViz2tripsLF(modelRW().lf.get)).call()
+          .map(res => UpdateSaveResult(res))))
+
+    case UpdateSaveResult(res) => updated(modelRW().modify(_.saveResult).setTo(res))
+
     //
     case SearchAlterNode(value) =>
-      println(s"Searching $value")
-
       updated(
         modelRW().copy(alternatives =
           modelRW().alternatives.copy(nodeAlters = modelRW().alternatives.nodeAlters.pending())),
@@ -455,6 +635,12 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(m
         modelRW().copy(undoManager = UndoManager(action :: modelRW().undoManager.actionStack))
       )
 
+    case ClearUndo =>
+      println("Clear Undo")
+      updated(
+        modelRW().copy(undoManager = UndoManager(List.empty))
+      )
+
     case EnableUndo =>
       updated(modelRW().copy(undoManager = modelRW().undoManager.copy(undoEnable = true)))
 
@@ -467,7 +653,7 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(m
         modelRW().modify(_.taskInfos).setTo(modelRW().taskInfos.map(ti =>{
           val x = ti.partition(_.id == taskID)
           val x1 = x._1.map(ti2 =>
-            ti2.copy(comments = Comment(modelRW().user, value) :: ti2.comments)) ::: x._2
+            ti2.copy(comments = Comment(modelRW().user.id, value) :: ti2.comments)) ::: x._2
           x1.sortBy(_.id)
         }))
       )
@@ -478,25 +664,26 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(m
 // Application circuit
 object MainCircuit extends Circuit[RootModel] with ReactConnector[RootModel] {
   // initial application model
-  override protected def initialModel = RootModel(Empty, Empty,
+  override protected def initialModel = RootModel(Empty, StatisticHelper(Empty, User.invalidUser),
     EditorHelper(User.invalidUser,
-      Empty, Empty, None, SelectState(None, None),Alternatives(Empty, Empty), UndoManager(List.empty)
-    ), TaskViewerHelper(Empty,Empty,Empty, Empty), GoldViewerHelper(Empty, Empty,Empty,Empty)
+      Empty, Empty, None, SelectState(None, None),Alternatives(Empty, Empty), UndoManager(List.empty),FailResult
+    ), TaskViewerHelper(Empty,Empty,Empty, Empty), GoldViewerHelper(Empty, Empty, Empty, Empty, Empty, FailResult),
+    EvaluationHelper(Empty, Map.empty[Int,Pot[Double]])
   )
 
   // combine all handlers into one
   override protected val actionHandler = composeHandlers(
     new UserHandler(zoomRW(_.user)((m, u) => m.copy(user = u))),
     new StatisticHandler(
-      zoomRW(_.statistics)((m, u) => m.copy(statistics = u)), zoom(_.user.headOption.getOrElse(User.invalidUser)).value),
+      zoomRW(_.statistics)((m, u) => m.copy(statistics = u))),
 
-    new GraphHandler(zoomRW(_.editorHelper)((m, u) => m.copy(editorHelper = u))/*,
-      userP = zoomRW(_.user)((x1,x2) => x2)*/),
+    new GraphHandler(zoomRW(_.editorHelper)((m, u) => m.copy(editorHelper = u))),
 
-    new TasksHandler(zoomRW(_.taskHelper)((m, u) => m.copy(taskHelper = u)),
-      user = zoom(_.user.headOption.getOrElse(User.invalidUser)).value),
+    new TasksHandler(zoomRW(_.taskHelper)((m, u) => m.copy(taskHelper = u))),
 
-    new GoldHandler(zoomRW(_.goldHelper)((m, u) => m.copy(goldHelper = u)),
+    new GoldHandler(zoomRW(_.goldHelper)((m, u) => m.copy(goldHelper = u))),
+
+    new EvaluationHandler(zoomRW(_.evaluationHelper)((m, u) => m.copy(evaluationHelper = u)),
       user = zoom(_.user.headOption.getOrElse(User.invalidUser)).value)
   )
 }

@@ -16,7 +16,7 @@ import org.scalajs.dom
 import org.scalajs.dom._
 import org.scalajs.dom.KeyboardEvent
 import rat.client.components.Bootstrap.Card.Header
-import rat.client.components.Bootstrap.{BTag, Button, ButtonList, Card, CommonStyle, Label, OButton, Panel}
+import rat.client.components.Bootstrap.{BTag, Button, ButtonList, Card, CommonStyle, Label, Modal, OButton, Panel}
 import rat.shared._
 
 import scala.language.implicitConversions
@@ -32,10 +32,11 @@ object Editor {
 
   case class Props(proxy: ModelProxy[EditorHelper])
 
-  case class State(mouseLocation: RPoint, key: Boolean = false,
+  case class State(mouseLocation: RPoint = RPoint(), key: Boolean = false,
                    edgeAlterSelected: Option[EdgeAlternative] = None, nodeAlterSelected: Option[NodeAlternative] = None,
-                   selectedTask: Option[Int] = None, infoSearch: String = "", nodeEdgeSearch: String = ""
-                  )
+                   infoSearch: String = "",
+                   nodeEdgeSearch: String = "", showGold:Boolean = false,
+                   switchTasks:Boolean=false, switchTab:Boolean=false)
 
   class Backend($: BackendScope[Props, State]) extends OnUnmount {
 
@@ -79,8 +80,11 @@ object Editor {
           else p.proxy.dispatch(
             ActionBatch(
               SelectAction(Some(id), None),
-              SearchAlterNode(p.proxy().lf.map(_.graphViz.nodes(id).value.value.getOrElse("type", "")).head)
-            ))
+              SearchAlterNode(
+                if(p.proxy().lf.map(_.graphViz.nodes(id).value.value.getOrElse("type", "")).head.startsWith("sa_"))
+                  "sa_"
+                else p.proxy().lf.map(_.graphViz.nodes(id).value.value.getOrElse("word", "")).head))) >>
+            $.modState(_.copy(nodeEdgeSearch = ""))
         })
       }
       x
@@ -106,7 +110,8 @@ object Editor {
     def createToolBar(s: State, p: Props, lf: TripsLFViz): ReactNode = {
       if (p.proxy().selectState.isNode.isDefined) {
         val selectedNode = p.proxy().lf.head.graphViz.nodes(p.proxy().selectState.isNode.get)
-        val isSplitable = selectedNode.value.value.contains("word") && selectedNode.value.value("word").contains("_")
+        val isSplitable = selectedNode.value.value.contains("word") &&
+          selectedNode.value.value("word").contains("_")
         val delete = OButton(OButton.Props(
           p.proxy.dispatch(
             ActionBatch(
@@ -138,6 +143,48 @@ object Editor {
       }
     }
 
+    def getTasksOrGolds(s:State, p:Props):Callback = {
+      val tsksOrGolds =
+        if(!s.showGold)
+           p.proxy.dispatch(ActionBatch(GetGoldsForEdit, UpdateSelectedTask(None))) >>
+             $.modState(_.copy(showGold = true, edgeAlterSelected = None, nodeAlterSelected = None))
+         else p.proxy.dispatch(ActionBatch(GetUserTasks, UpdateSelectedTask(None))) >> $.modState(_.copy(
+          showGold = false, edgeAlterSelected = None, nodeAlterSelected = None))
+
+      tsksOrGolds >> p.proxy.dispatch(UpdateEditorGraph(None))
+    }
+
+    def saveSwitchTask(s:State, p:Props, save:Boolean = true, switch:Boolean = true):Callback = {
+//      println(s"____________________$save ___ $switch ____________________")
+//      val saveCallback = if(save && s.lastSelectedTask.isDefined) saveLastTask(s,p) else Callback.empty
+//      val switchCallback = if(switch) {
+//        if (s.showGold)
+//          p.proxy.dispatch(GetGoldGraphForEdit(s.selectedTask.get))
+//        else
+//          p.proxy.dispatch(GetUserGraph(s.selectedTask.get))
+//      } else Callback.empty
+
+      p.proxy.dispatch(ClearUndo) >> p.proxy.dispatch(SelectAction(None, None)) >>
+        {
+          if(save && p.proxy.zoom(_.lastSelectedTask).apply().isDefined) saveLastTask(s,p) else Callback.empty
+        } >> {
+        if(switch) {
+          if (s.showGold)
+            p.proxy.dispatch(GetGoldGraphForEdit(p.proxy.zoom(_.selectedTask.get).apply()))
+          else
+            p.proxy.dispatch(GetUserGraph(p.proxy.zoom(_.selectedTask.get).apply()))
+        } else Callback.empty
+      }
+    }
+
+    def saveLastTask(s:State, p:Props):Callback = {
+//      println(s"Saving ${s.lastSelectedTask}")
+      if (s.showGold)
+        p.proxy.dispatch(SaveEditedGold(p.proxy.zoom(_.lastSelectedTask.get).apply()))
+      else
+        p.proxy.dispatch(SaveEditedGraph(p.proxy.zoom(_.lastSelectedTask.get).apply()))
+    }
+
     def render(s: State, p: Props) = {
       val pr = p.proxy
       val lfPot = pr.zoom(_.lf)
@@ -153,13 +200,30 @@ object Editor {
         p.proxy().lf.head.graphViz.edges.maxBy(_._2.value.labelLoc.topLeft.y)._2.value.labelLoc.topLeft.y + 400
       else 500
 
-      println(s.infoSearch)
 
       <.div(^.className := "row",
-        <.div(^.className := "col-sm-2",
+        if (s.switchTasks || s.switchTab) modal(s, p) else <.div(),
+        <.div(^.className := "col-sm-2", ^.overflowY := "auto", ^.maxHeight := 650,
           Card(
             Card.Props(
-              header = Some(Header("Tasks")),
+              header = Some(
+                Header(
+                  if(p.proxy.zoom(_.user.access).apply() == "all")
+                    <.form(
+                      <.div(^.className := "form-check",
+                        <.label(^.className := "form-check-label",
+                          <.input(^.`type` := "checkbox", ^.className := "form-check-input", ^.checked := s.showGold,
+                            ^.onChange --> {
+                              if(pr().selectedTask.isDefined && !pr.zoom(_.undoManager.actionStack.isEmpty).value)
+                                $.modState(_.copy(switchTab = true, showGold = !s.showGold))
+                              else getTasksOrGolds(s,p)
+                            }
+                          ), "Show Golds"
+                        )
+                      )
+                    )
+                  else <.div()
+                )),
               footer = None
             ),
             graphInfos().renderEmpty(<.h5(^.textAlign := "center", "Please Refresh")),
@@ -168,19 +232,45 @@ object Editor {
             graphInfos().renderReady(grInfos =>
               <.div(
                 <.div(^.className := "input-group",
-                  <.input(^.tpe := "text", ^.className := "form-control", ^.placeholder := "Search for...",
+                  <.input(^.tpe := "text", ^.className := "form-control", ^.placeholder := "Search for id ...",
                     ^.onChange ==> onChange),
                   <.span(^.className := "input-group-btn",
                     Button(Button.Props(onClick = Callback.empty), Icon.search)
                   )
                 ),
                 ButtonList(
-                  grInfos.filter(_.id.toString.contains(s.infoSearch)).map { gi =>
+                  grInfos.filter(_.id.toString.contains(s.infoSearch)).map { gi => {
+//                    println(gi.userStat)
+                    val stl = gi.userStat(p.proxy.zoom(_.user).apply().id)
+                    val styles = stl match {
+                      case UnEdited => CommonStyle.default
+                      case Submitted => CommonStyle.success
+                      case Impossible => CommonStyle.warning
+                    }
                     ButtonList.ButtonItem(
-                      <.div(BTag(gi.id.toString, style = CommonStyle.info), " " + gi.sentence),
-                      active = s.selectedTask.contains(gi.id),
-                      onClick = pr.dispatch(GetUserGraph(gi.id)) >> $.modState(_.copy(selectedTask = Some(gi.id)))
+                      <.div(BTag(gi.id.toString, style = styles), " " + gi.sentence),
+                      active = pr().selectedTask.contains(gi.id),
+                      style = styles,
+                      onClick =
+                        if (lfPot().isReady && !pr.zoom(_.undoManager.actionStack.isEmpty).value) {
+                          pr.dispatch(ActionBatch(UpdateSelectedLastTask(p.proxy.zoom(_.selectedTask).apply()),
+                            UpdateSelectedTask(Some(gi.id)))) >> $.modState(_.copy(switchTasks = true))
+
+                        }
+                        else {
+//                          println("Doing Normal")
+                          p.proxy.dispatch(ClearUndo) >> p.proxy.dispatch(SelectAction(None, None)) >> {
+                            if (!s.showGold)
+                              pr.dispatch(ActionBatch(UpdateSelectedLastTask(pr().selectedTask),
+                                UpdateSelectedTask(Some(gi.id)), GetUserGraph(gi.id)))
+                            else
+                              pr.dispatch(ActionBatch(UpdateSelectedLastTask(pr().selectedTask),
+                                UpdateSelectedTask(Some(gi.id)), GetGoldGraphForEdit(gi.id)))
+
+                          }
+                        }
                     )
+                  }
                   }
                 )
               )
@@ -196,11 +286,10 @@ object Editor {
 
             Card(
               Card.Props(
-                header = Some(Card.Header(createToolBar(s, p, lf)))
-              ),
+                header = Some(Card.Header(createToolBar(s, p, lf)))),
               <.div(^.overflowY := "scroll", ^.overflowX := "scroll", ^.maxHeight := 650,
-                if (s.selectedTask.isDefined) {
-                  val content = graphInfos().head.find(_.id == s.selectedTask.get).map(x =>
+                if (pr().selectedTask.isDefined) {
+                  val content = graphInfos().head.find(_.id == pr().selectedTask.get).map(x =>
                     <.div(BTag(x.id.toString, style = CommonStyle.info), x.sentence))
                   <.div(^.className := "alert alert-info", ^.role := "alert", content.getOrElse(<.div()))
                 }
@@ -237,7 +326,7 @@ object Editor {
             )
           )
         ),
-        <.div(^.className := "col-sm-3",
+        <.div(^.className := "col-sm-3", ^.overflowY := "auto", ^.maxHeight := 650,
           Card(
             Card.Props(
               header = Some(Card.Header(
@@ -256,18 +345,22 @@ object Editor {
                 ),
                 OButton(
                   OButton.Props(
-                    p.proxy.dispatch(
-                      ActionBatch(
-                        LayoutLF
-                      )
-                    ),
+                    onClick =
+                      if (pr().selectedTask.isDefined)
+                        p.proxy.dispatch(
+                          if (s.showGold)
+                            SaveEditedGold(pr().selectedTask.get)
+                          else
+                            SaveEditedGraph(pr().selectedTask.get)
+                        )
+                      else Callback.empty,
                     style = CommonStyle.success,
                     addStyles = Seq(bss.pullRight)
-                  ), "Save ",Icon.save
+                  ), "Save ", Icon.save
                 )
               ))
             ),
-            <.div(bss.panelBody,
+            <.div(
               lfPot().renderReady(lf => {
                 if (pr().selectState.isNode.isDefined) {
                   val mps = lf.graphViz.nodes(pr().selectState.isNode.get).value.value
@@ -321,8 +414,8 @@ object Editor {
                           ButtonList(
                             altrs.map(al =>
                               ButtonList.ButtonItem(
-                                <.div(BTag(al.typ, style = if(al.isWordNetMapping) CommonStyle.info else CommonStyle.info),
-                                  <.p(al.path2root.mkString(">"), ^.fontSize:="12px")),
+                                <.div(BTag(al.typ, style = if (al.isWordNetMapping) CommonStyle.info else CommonStyle.info),
+                                  <.p(al.path2root.mkString(">"), ^.fontSize := "12px")),
                                 active = al.typ == lf.graphViz.nodes(pr().selectState.isNode.get).value.value.getOrElse("type", "-"),
                                 onClick = pr.dispatch(
                                   ActionBatch(
@@ -350,33 +443,30 @@ object Editor {
                           Button(Button.Props(onClick = pr.dispatch(SearchAlterEdge(s.nodeEdgeSearch))), Icon.search)
                         )
                       ),
-                      alters().edgeAlters.renderEmpty(<.h5(^.textAlign := "center", "Please select a graph")),
-                      alters().edgeAlters.renderPending(_ => <.div(^.textAlign := "center", Icon.spinnerAnimateLarge)),
-                      alters().edgeAlters.renderFailed(ex => <.div(<.p("Failed to load"))),
-                      alters().edgeAlters.renderReady(altrs =>
-                        ButtonList(
-                          altrs.map(al =>
-                            ButtonList.ButtonItem(
-                              <.div(BTag("doob", style = CommonStyle.info), " asdas"),
-                              active = al.value == lf.graphViz.edges(pr().selectState.isEdge.get).value.value,
-                              onClick = pr.dispatch(
-                                ActionBatch(
-                                  ModifyEdge(pr().selectState.isEdge.get, al.value),
-                                  LayoutLF
-                                )
+                      ButtonList(
+                        SharedUtil.allEdgeAlterMappings("all").filter(_.value.contains(s.nodeEdgeSearch))
+                          .map(al =>
+                          ButtonList.ButtonItem(
+                            <.div(BTag(al.value, style = CommonStyle.info)),
+                            active = al.value == lf.graphViz.edges(pr().selectState.isEdge.get).value.value,
+                            onClick = pr.dispatch(
+                              ActionBatch(
+                                ModifyEdge(pr().selectState.isEdge.get, al.value),
+                                LayoutLF
                               )
                             )
                           )
                         )
                       )
+
                     )
                   )
                 }
                 else {
-                  if(s.selectedTask.isDefined && graphInfos().isReady)
+                  if (pr().selectedTask.isDefined && graphInfos().isReady)
                     List(CommentComp(
-                      graphInfos().head.find(_.id == s.selectedTask.get).get.comments,
-                      newComment = (st) => pr.dispatch(AddComment(s.selectedTask.get, st))
+                      graphInfos().head.find(_.id == pr().selectedTask.get).get.comments,
+                      newComment = (st) => pr.dispatch(AddComment(pr().selectedTask.get, st))
                     ))
                   else List(<.h5("Select a Node or an Edge"))
                 }
@@ -388,10 +478,50 @@ object Editor {
         )
       )
     }
+
+    def modal(s:State, p:Props) = {
+      Modal(Modal.Props(
+        // header contains a cancel button (X)
+        header = hide =>
+          <.span(<.h4(
+              if(s.switchTasks) "Are you sure that you want change task?"
+              else if(s.switchTab) "Are you sure that you want to switch to golds?"
+              else "Close me!")),
+        // footer has the OK button that submits the form before hiding it
+        footer = hide => {
+//          println(s"Last Selected ${s.lastSelectedTask}")
+//          println(s"Selected ${s.selectedTask}")
+          <.span(
+            Button(
+              Button.Props(hide >> {
+                //println(s"selected task: ${s.selectedTask}")
+                if (s.switchTasks) saveSwitchTask(s, p, save = true, switch = true)
+                else if(s.switchTab) saveSwitchTask(s, p, save = true, switch = false) >> getTasksOrGolds(s, p)
+                else Callback.empty
+              }),
+              "Save And Leave"),
+            Button(
+              Button.Props(
+                if (s.switchTasks) hide >> saveSwitchTask(s, p, save = false, switch = true)
+                else if (s.switchTab) hide >> saveSwitchTask(s, p, save = false, switch = false) >>getTasksOrGolds(s, p)
+                else hide
+              ),
+              "Leave")
+          )
+        },
+        // this is called after the modal has been hidden (animation is completed)
+        closed = $.modState(_.copy(switchTab = false, switchTasks = false)))//formClosed(s, p)),
+
+
+      )
+    }
   }
 
   val component = ReactComponentB[Props]("graphComp")
-    .initialState(State(RPoint(), key = false))
+    .initialState({
+      println("initilizing again")
+      State(RPoint(), key = false)
+    })
     .renderBackend[Backend]
     .componentWillMount(scope =>
       scope.props.proxy.dispatch(GetUserTasks)

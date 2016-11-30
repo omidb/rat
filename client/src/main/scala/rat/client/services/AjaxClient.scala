@@ -14,7 +14,7 @@ import scala.scalajs.js.typedarray._
 object AjaxClient extends autowire.Client[ByteBuffer, Pickler, Pickler] {
   override def doCall(req: Request): Future[ByteBuffer] = {
     dom.ext.Ajax.post(
-      url = "/api/" + req.path.mkString("/"),
+      url = "/rocnlp/api/" + req.path.mkString("/"),
       data = Pickle.intoBytes(req.args),
       responseType = "arraybuffer",
       headers = Map("Content-Type" -> "application/octet-stream")

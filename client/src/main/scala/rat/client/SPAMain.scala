@@ -27,6 +27,7 @@ object SPAMain extends js.JSApp {
   case object EditorLoc extends Loc
   case object TasksLoc extends Loc
   case object GoldsLoc extends Loc
+  case object EvaluationLoc extends Loc
 
 
   val loginWrapper = MainCircuit.connect(_.user)
@@ -34,6 +35,7 @@ object SPAMain extends js.JSApp {
   val editorWrapper = MainCircuit.connect(x => x.editorHelper)
   val tasksWrapper = MainCircuit.connect(x => x.taskHelper)
   val goldsWrapper = MainCircuit.connect(x => x.goldHelper)
+  val evaluationWrapper = MainCircuit.connect(x => x.evaluationHelper)
 
   def getRouter(userValid:CallbackB) = {
     RouterConfigDsl[Loc].buildConfig { dsl =>
@@ -44,6 +46,7 @@ object SPAMain extends js.JSApp {
          | staticRoute("#editor", EditorLoc) ~> renderR(ctl => editorWrapper(proxy => Editor(proxy)))
          | staticRoute("#tasks", TasksLoc) ~> renderR(ctl => tasksWrapper(proxy => TaskViewer(proxy)))
           | staticRoute("#golds", GoldsLoc) ~> renderR(ctl => goldsWrapper(proxy => GoldViewer(proxy)))
+          | staticRoute("#evaluation", EvaluationLoc) ~> renderR(ctl => evaluationWrapper(proxy => Evaluation(proxy)))
           ).addCondition(userValid)(_ => redirectToPage(LoginLoc)(Redirect.Push))
 
       (staticRoute("#login", LoginLoc) ~> renderR(ctl => loginWrapper(proxy => Login(proxy, ctl)))
@@ -77,7 +80,7 @@ object SPAMain extends js.JSApp {
   def main(): Unit = {
     log.warn("Application starting")
     // send log messages also to the server
-    log.enableServerLogging("/logging")
+    log.enableServerLogging("/rocnlp/logging")
     log.info("This message goes to server as well")
 
     // create stylesheet

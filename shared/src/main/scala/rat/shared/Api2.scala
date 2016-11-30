@@ -8,7 +8,7 @@ trait Api2 {
 
   def getAnnotationStats(user: User): AnnotationStatistics
 
-  def calculateAgreement(): Unit
+  def calculateAgreement(user: User): Unit
 
   def getUserTasks(user: User): Option[List[TaskInfo]]
 
@@ -18,21 +18,31 @@ trait Api2 {
 
   def goldTask(user:User, taskID:Int): ResultStatus
 
-  def submitTask(user:User, taskID:Int): ResultStatus
+  def saveTask(user:User, taskID:Int, lf:TripsLF): ResultStatus
 
   def getTask(user:User, taskID:Int): Map[User, TripsLF]
 
   def getUserGraph(user: User, id:Int): Option[TripsLF]
 
-  def getAllGolds(user: User): Option[List[GoldInfo]]
+  def getAllGolds(): Option[List[TaskInfo]]
 
-  def getGold(taskID:Int): TripsLF
+  def getAllDomainGold(): Option[Map[String, List[TaskInfo]]]
+
+  def getGold(taskID:Int): Option[TripsLF]
+
+  def saveGold(user:User, taskID:Int, lf:TripsLF): ResultStatus
 
   def getNodeAlters(value:String): Option[List[NodeAlternative]]
 
   def getEdgeAlters(value:String): Option[List[EdgeAlternative]]
 
-  def searchGolds(search:String): Option[List[GoldInfo]]
+  def searchGolds(search:String): Option[List[TaskInfo]]
+
+  def evalGoldID(id:Int):Double
+
+  def getLispForGolds(ids:List[Int]):String
+
+  def rollBack(goldID:Int): ResultStatus
 
 
 

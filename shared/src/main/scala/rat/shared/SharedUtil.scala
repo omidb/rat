@@ -25,7 +25,7 @@ object SharedUtil {
     EdgeAlternative("11", "ground"),
     EdgeAlternative("12", "scale"),
     EdgeAlternative("75", "standard"),
-    EdgeAlternative("12", "scale")),
+    EdgeAlternative("77", "condition")),
     "quantities" -> List(
     EdgeAlternative("13", "unit"),
     EdgeAlternative("14", "amount")),

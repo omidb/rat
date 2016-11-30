@@ -12,7 +12,8 @@ object Table {
 
   // if ascending ^ otherwise downward
 
-  case class TableHeadingItem(label:String, isAscending:Boolean, isDescending:Boolean, onClick:Callback)
+  case class TableHeadingItem(label:String, isAscending:Boolean = false, isDescending:Boolean= false,
+                              onClick:Callback = Callback.empty)
   case class TableHeading(items: List[TableHeadingItem])
 
   case class TableItem(items: List[List[ReactNode]])

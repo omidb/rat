@@ -49,6 +49,7 @@ object Settings {
     val nlputils = "0.1.1-SNAPSHOT"
 
     val quicklens = "1.4.8"
+    val circe = "0.6.1"
   }
 
   /**
@@ -71,7 +72,11 @@ object Settings {
     "com.lihaoyi" %% "utest" % versions.uTest % Test,
     "org.xerial" % "sqlite-jdbc" % versions.quill_jdbc,
     "io.getquill" %% "quill-jdbc" % versions.quill,
-    "com.github.mrmechko" %% "strips2" % "0.0.1-SNAPSHOT"
+    "com.github.mrmechko" %% "strips2" % "0.0.1-SNAPSHOT",
+    "io.circe" %% "circe-core" % versions.circe,
+    "io.circe" %% "circe-generic" % versions.circe,
+    "io.circe" %% "circe-parser" % versions.circe
+
   ))
 
   /** Dependencies only used by the JS project (note the use of %%% instead of %%) */
@@ -91,7 +96,7 @@ object Settings {
   val jsDependencies = Def.setting(Seq(
     "org.webjars.bower" % "react" % versions.react / "react-with-addons.js" minified "react-with-addons.min.js" commonJSName "React",
     "org.webjars.bower" % "react" % versions.react / "react-dom.js" minified "react-dom.min.js" dependsOn "react-with-addons.js" commonJSName "ReactDOM",
-    "org.webjars" % "jquery" % versions.jQuery / "jquery.js" minified "jquery.min.js",
+    //"org.webjars" % "jquery" % versions.jQuery / "jquery.js" minified "jquery.min.js",
 //    "org.webjars.bower" % "bootstrap" % versions.bootstrap / "dist/bootstrap.js" minified "dist/bootstrap.min.js"  dependsOn "jquery.js",
     "org.webjars" % "chartjs" % versions.chartjs / "Chart.js" minified "Chart.min.js",
     "org.webjars" % "log4javascript" % versions.log4js / "js/log4javascript_uncompressed.js" minified "js/log4javascript.js"

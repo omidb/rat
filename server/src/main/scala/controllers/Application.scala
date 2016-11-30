@@ -5,10 +5,12 @@ import java.nio.ByteBuffer
 import boopickle.Default._
 import com.github.omidb.nlp.formats.SExpression
 import com.google.inject.Inject
+import io.getquill._
+//import play.api.db.evolutions.Evolutions
 import play.api.{Configuration, Environment}
 import play.api.mvc._
 import rat.shared.Api2
-import services.{ApiService, DB}
+import services.{AlternativeManager, ApiService, SearchEngine, Tasks}
 
 import scala.concurrent.ExecutionContext.Implicits.global
 
@@ -18,9 +20,11 @@ object Router extends autowire.Server[ByteBuffer, Pickler, Pickler] {
 }
 
 class Application @Inject() (implicit val config: Configuration, env: Environment) extends Controller {
-  val apiService = new ApiService()
-  DB.init()
 
+  lazy val db = new JdbcContext[SqliteDialect, CamelCase]("db")
+  lazy val tasks = new Tasks(db)
+  lazy val se = new SearchEngine(tasks)
+  val apiService = new ApiService(tasks, se)
 
   def index = Action {
     Ok(views.html.index("RocNLP"))

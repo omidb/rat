@@ -59,7 +59,7 @@ object Bootstrap {
 
   object ButtonList {
 
-    case class ButtonItem(content: ReactNode, onClick: Callback,
+    case class ButtonItem(content: ReactNode, onClick: Callback,style: CommonStyle.Value = CommonStyle.default,
                           active: Boolean = false, addStyles: Seq[StyleA] = Seq())
 
     case class Props(items: List[ButtonItem], ellipsis:Boolean= true)
@@ -77,7 +77,7 @@ object Bootstrap {
               if(item.active)
                 ^.className := "list-group-item list-group-item-action active"
               else
-                ^.className := s"list-group-item list-group-item-action",
+                ^.className := "list-group-item list-group-item-action",//bss.buttonListGrp(item.style),
               item.addStyles,
               ^.tpe := "button",
               p.ellipsis ?= (^.whiteSpace := "nowrap"),
@@ -152,7 +152,7 @@ object Bootstrap {
 
     case class Props(header: List[ReactNode] = List(), inside: List[ReactNode] = List(), left:Boolean = true)
 
-    val component = ReactComponentB[Props]("Label")
+    val component = ReactComponentB[Props]("Popover")
       .stateless
       .render_P(p => {
         val side = if (p.left) "left" else "right"
@@ -188,8 +188,8 @@ object Bootstrap {
   object Modal {
 
     // header and footer are functions, so that they can get access to the the hide() function for their buttons
-    case class Props(header: Callback => ReactNode, footer: Callback => ReactNode, closed: Callback, backdrop: Boolean = true,
-                     keyboard: Boolean = true)
+    case class Props(header: Callback => ReactNode, footer: Callback => ReactNode, closed: Callback,
+                     backdrop: Boolean = true, keyboard: Boolean = false)
 
     class Backend(t: BackendScope[Props, Unit]) {
       def hide = Callback {
@@ -205,8 +205,8 @@ object Bootstrap {
 
       def render(p: Props, c: PropsChildren) = {
         val modalStyle = bss.modal
-        <.div(modalStyle.modal, modalStyle.fade, ^.role := "dialog", ^.aria.hidden := true,
-          <.div(modalStyle.dialog,
+        <.div(modalStyle.modal, modalStyle.fade, ^.role := "dialog", /*^.aria.hidden := true,*/
+          <.div(modalStyle.dialog, ^.role:="document",
             <.div(modalStyle.content,
               <.div(modalStyle.header, p.header(hide)),
               <.div(modalStyle.body, c),
@@ -221,7 +221,9 @@ object Bootstrap {
       .renderBackend[Backend]
       .componentDidMount(scope => Callback {
         val p = scope.props
+
         // instruct Bootstrap to show the modal
+//        jQuery(scope.getDOMNode()).modal(js.Dynamic.literal())
         jQuery(scope.getDOMNode()).modal(js.Dynamic.literal("backdrop" -> p.backdrop, "keyboard" -> p.keyboard, "show" -> true))
         // register event listener to be notified when the modal is closed
         jQuery(scope.getDOMNode()).on("hidden.bs.modal", null, null, scope.backend.hidden _)

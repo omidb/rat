@@ -32,10 +32,7 @@ object CommentComp {
 //          Card.Props(),
         <.div(
           p.comments.map(c =>
-            Card(
-              Card.Props(header = Some(Card.Header(BTag(c.user.id, style = CommonStyle.info)))),
-              c.value
-            )
+            <.div(BTag(c.user, style = CommonStyle.info), c.value)
           )
         )
       )

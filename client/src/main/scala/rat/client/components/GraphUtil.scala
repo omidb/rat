@@ -63,6 +63,20 @@ object GraphUtil {
     lfsViz
   }
 
+  def tripsLFViz2tripsLF(lfviz: TripsLFViz): TripsLF = {
+    val lf =
+      TripsLF(
+        rootNode = lfviz.rootNode,
+        graph = lfviz.graphViz.map(
+            (nId, n) => {
+              n.value
+            },
+            (eId, e) => e.value
+          )
+      )
+    lf
+  }
+
   def textBoundingBox(p: Array[String]) = {
     RVector(p.map(_.length).max * 12 + p.maxBy(_.length).count(x => x == ' ') * 25, p.length * 20)
   }

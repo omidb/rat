@@ -29,6 +29,8 @@ class BootstrapStyles(implicit r: mutable.Register) extends StyleSheet.Inline()(
 
   val buttonOutlineOpt = newStyle(btDomain, "btn", "outline")
 
+  val buttonListGrp = newStyle(btDomain, "list-group-item", "action")
+
   val buttonListOpt = commonStyle(csDomain, "btn")
 
   val button = buttonOpt(default)

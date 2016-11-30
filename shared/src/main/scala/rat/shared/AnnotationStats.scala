@@ -19,4 +19,6 @@ object AnnotInfo{
 
 case class AnnotationStats(size:Int, agreementHistory:Seq[RPoint], dataSize:Int, annotatedSize:Int, annotInfo:AnnotInfo)
 
-case class AnnotationStatistics(myRemaining:Int, allSubmitted:Int, ready2Gold:Int ,goldSize:Int)
+case class OntologyStat(id:Int, word:String, tpe:String, currentWords:List[String])
+case class AnnotationStatistics(myRemaining:Int, allSubmitted:Int, ready2Gold:Int ,goldSize:Int,
+                                ontologyStat: List[OntologyStat])

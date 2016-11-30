@@ -78,27 +78,29 @@ object TaskViewer {
                         List(t.id),
                         List(t.sentence),
                         t.userStat.toList.map {
-                          case (u, Impossible) => BTag(u.id, style = CommonStyle.warning)
-                          case (u, Submitted) => BTag(u.id, style = CommonStyle.info)
-                          case (u, UnEdited) => BTag(u.id, style = CommonStyle.danger)
+                          case (u, Impossible) => BTag(u, style = CommonStyle.warning)
+                          case (u, Submitted) => BTag(u, style = CommonStyle.info)
+                          case (u, UnEdited) => BTag(u, style = CommonStyle.danger)
                         },
-                        List(t.agreement),
+                        List(f"${t.agreement}%1.2f"),
                         List(
-                          OButton(OButton.Props(
-                            addStyles = Seq(bss.pullRight, bss.buttonXS),
-                            style = CommonStyle.danger,
-                            onClick =
-                              if (s.deleteCheck)
-                                $.modState(_.copy(deleteCheck = false)) >> p.proxy.dispatch(DeleteTask(t.id))
-                              else $.modState(_.copy(deleteCheck = true))
-                          ), if (s.deleteCheck) "Sure?" else "Delete"),
+                          if(p.proxy.zoom(_.user).apply().access == "all")
+                            OButton(OButton.Props(
+                              addStyles = Seq(bss.pullRight, bss.buttonXS),
+                              style = CommonStyle.danger,
+                              onClick =
+                                if (s.deleteCheck)
+                                  $.modState(_.copy(deleteCheck = false)) >> p.proxy.dispatch(DeleteTask(t.id))
+                                else $.modState(_.copy(deleteCheck = true))
+                            ), if (s.deleteCheck) "Sure?" else "Delete")
+                          else <.div(),
 
                           OButton(OButton.Props(
                             addStyles = Seq(bss.pullRight, bss.buttonXS),
                             style = CommonStyle.primary,
                             onClick = p.proxy.dispatch(GetTaskGraphs(t.id)) >> $.modState(_.copy(selectedTask = Some(t.id)))), "Select"),
 
-                          if (t.isFinished)
+                          if (t.isFinished && p.proxy.zoom(_.user).apply().access == "all")
                             OButton(OButton.Props(
                               addStyles = Seq(bss.pullRight, bss.buttonXS),
                               style = CommonStyle.warning,
@@ -192,12 +194,12 @@ object TaskViewer {
                     <.div(^.className := "col-sm-6",
                       Card(
                         Card.Props(addStyles = Seq(^.height := "600px", ^.overflow := "auto")),
-                        if(s.selectedUsers._1.isDefined)
+                        if(s.selectedUsers._2.isDefined)
                           svg(width := 2000, height := 2000, viewBox:= s"0,0,${2000*s.zoomSize},${2000*s.zoomSize}",
                             g(transform := GraphUtil.move(Array(5, 5)),
                               GraphComponent(
                                 GraphComponent.Props(
-                                  lf = grphs(s.selectedUsers._1.get)
+                                  lf = grphs(s.selectedUsers._2.get)
                                 )
                               )
                             )

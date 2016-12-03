@@ -536,7 +536,8 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(m
       updated(modelRW().copy(taskInfos = modelRW().taskInfos.pending()),
         Effect(
           AjaxClient[Api2].getAllGolds().call().map(golds =>
-            UpdateUserTasks(golds)
+            {println(golds)
+            UpdateUserTasks(golds)}
           )
         )
       )

@@ -54,14 +54,15 @@ object GoldViewer {
       <.div(
         <.div(^.className := "row",
           <.div(^.className := "col-sm-6",
-            <.form(
-              <.div(^.className:="form-group",
-                <.label(^.`for`:="exampleTextarea", "Search"),
-                <.textarea(^.className:="form-control", ^.id:="exampleTextarea", ^.rows:="3", ^.onChange ==> onChange)
+            <.div(
+              <.div(
+                <.label("Search"),
+                <.textarea(^.className:="form-control", ^.id:="exampleTextarea", ^.rows:="3", ^.onChange ==> onChange,
+                  s.searchStr)
               ),
               <.div(^.className:="row",
                 <.div(^.className:="col-sm-4",
-                  <.button(^.`type`:="submit", ^.className:="btn btn-primary", "Search",
+                  <.button(^.className:="btn btn-primary", "Search",
                     ^.onClick --> p.proxy.dispatch(SearchGold(s.searchStr)))
                 ),
                 <.div(^.className:="col-sm-4",
@@ -229,7 +230,8 @@ object GoldViewer {
   }
 
   val component = ReactComponentB[Props]("goldsComp")
-    .initialState(State(0, isAscending = false, deleteCheck = false, zoomSize = 1.0, selectedTask = None))
+    .initialState(State(0, isAscending = false, deleteCheck = false, zoomSize = 1.0, selectedTask = None,
+      searchStr = "((id::1 type::=have-property edge::neutral,2 edge::formal,3) \n(id::2 type::<person) (id::3 word::hungry)\n)"))
     .renderBackend[Backend]
     .componentWillMount(scope => scope.props.proxy.dispatch(GetAllGolds))
     .build

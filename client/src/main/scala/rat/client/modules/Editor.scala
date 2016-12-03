@@ -144,6 +144,7 @@ object Editor {
     }
 
     def getTasksOrGolds(s:State, p:Props):Callback = {
+      println(s"show golds ${s.showGold}")
       val tsksOrGolds =
         if(!s.showGold)
            p.proxy.dispatch(ActionBatch(GetGoldsForEdit, UpdateSelectedTask(None))) >>
@@ -214,9 +215,14 @@ object Editor {
                         <.label(^.className := "form-check-label",
                           <.input(^.`type` := "checkbox", ^.className := "form-check-input", ^.checked := s.showGold,
                             ^.onChange --> {
-                              if(pr().selectedTask.isDefined && !pr.zoom(_.undoManager.actionStack.isEmpty).value)
+                              if(pr().selectedTask.isDefined && !pr.zoom(_.undoManager.actionStack.isEmpty).value) {
+                                println("I am here")
                                 $.modState(_.copy(switchTab = true, showGold = !s.showGold))
-                              else getTasksOrGolds(s,p)
+                              }
+                              else {
+                                println("I am here 2")
+                                getTasksOrGolds(s,p)
+                              }
                             }
                           ), "Show Golds"
                         )
@@ -240,8 +246,8 @@ object Editor {
                 ),
                 ButtonList(
                   grInfos.filter(_.id.toString.contains(s.infoSearch)).map { gi => {
-//                    println(gi.userStat)
-                    val stl = gi.userStat(p.proxy.zoom(_.user).apply().id)
+                    //println(gi.userStat)
+                    val stl = if(s.showGold) gi.userStat.head._2 else  gi.userStat(p.proxy.zoom(_.user).apply().id)
                     val styles = stl match {
                       case UnEdited => CommonStyle.default
                       case Submitted => CommonStyle.success
@@ -414,7 +420,7 @@ object Editor {
                           ButtonList(
                             altrs.map(al =>
                               ButtonList.ButtonItem(
-                                <.div(BTag(al.typ, style = if (al.isWordNetMapping) CommonStyle.info else CommonStyle.info),
+                                <.div(BTag(al.typ, style = if (al.isWordNetMapping) CommonStyle.danger else CommonStyle.info),
                                   <.p(al.path2root.mkString(">"), ^.fontSize := "12px")),
                                 active = al.typ == lf.graphViz.nodes(pr().selectState.isNode.get).value.value.getOrElse("type", "-"),
                                 onClick = pr.dispatch(

@@ -13,7 +13,26 @@ import Impls._
 class ApiService(db:Tasks, se:SearchEngine) extends Api2{
   import db.db._
 
+  def calcLStDiff() = {
+    run(db.golds).flatMap{ g =>
+      db.decodeLF(g.graph).get.graph.nodes
+        .filter(n => n._2.value.contains("word") && n._2.value.contains("type"))
+        .map(n => {
+          val value = n._2.value("word")
+          n._2 -> {
+            if (value.toLowerCase.startsWith("sa_"))
+              SharedUtil.speechActAlters
+            else
+              AlternativeManager.getAllSenses(value).map(_.typ)
+          }
+        })
+        .filterNot(n => n._2.contains(n._1.value("type").toLowerCase))
+        .map(n => OntologyStat(g.id, n._1.value("word"), n._1.value("type"),
+          AlternativeManager.ont.-->(n._1.value("type").toLowerCase).map(_.words).getOrElse(List.empty)))
 
+    }
+  }
+  var lstDiff = calcLStDiff()
 
 
   override def signIn(userName: UserName):User = {
@@ -23,20 +42,15 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
 
 
   override def getAnnotationStats(user: User): AnnotationStatistics = {
-    val lst =
-      run(db.golds).flatMap{ g =>
-        db.decodeLF(g.graph).get.graph.nodes
-          .filter(n => n._2.value.contains("type") && n._2.value.contains("word"))
-          .map(n => OntologyStat(g.id, n._2.value("word"), n._2.value("type"),
-            AlternativeManager.ont.-->(n._2.value("type").toLowerCase).map(_.words).getOrElse(List.empty)))
-      }
+
     val gldSize = run(db.golds).size
     val tsks = run(db.tasks).map(TaskRow.toTaskInfo)
     AnnotationStatistics(
-      tsks.count(t => t.userStat.contains(user.id)), tsks.size, tsks.count(t => t.agreement == 1.0), gldSize, lst)
+      tsks.count(t => t.userStat.contains(user.id)), tsks.size, tsks.count(t => t.agreement == 1.0), gldSize, lstDiff)
   }
 
   override def calculateAgreement(user:User): Unit = {
+    lstDiff = calcLStDiff()
     run(db.tasks).map(TaskRow.toTaskInfo)
       .foreach(t => {
         val x = run(db.graphs.filter(_.id == lift(t.id)).map(_.graph)).flatMap(str => db.decodeLF(str))
@@ -79,8 +93,6 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
   }
 
   override def goldTask(user:User, taskID:Int): ResultStatus = {
-
-
     val r = transaction {
       val lf = run(db.graphs.filter(_.id == lift(taskID)).map(_.graph)).head
       val tsk = run(db.tasks.filter(_.id == lift(taskID)).map(x => (x.id, x.sentence, x.domain, x.usersStats, x.comments))).head

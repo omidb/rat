@@ -38,7 +38,7 @@ trait Api2 {
 
   def searchGolds(search:String): Option[List[TaskInfo]]
 
-  def evalGoldID(id:Int):Double
+  def evalGoldID(id:Int, parser:String):Double
 
   def getLispForGolds(ids:List[Int]):String
 

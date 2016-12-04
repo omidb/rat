@@ -142,7 +142,7 @@ object Evaluation {
                                 p.proxy.dispatch(
                                   RecursiveEvaluate(
                                     tasks.filter(t => s.selectedDomains.contains(t._1) && s.selectedDomains(t._1))
-                                      .values.toList.flatten.map(_.id), 0
+                                      .values.toList.flatten.map(_.id), 0,s.parserType
                                   )
                                 )
                             )

@@ -172,13 +172,21 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
     golds.map(gld => gld.groupBy(_.domain))
   }
 
-  override def evalGoldID(id:Int):Double = {
+  override def evalGoldID(id:Int, parser:String):Double = {
+//    println(parser, SharedUtil.parserAddress.getOrElse(parser, TripsServers.drumDev))
     val onlineParser = new TripsOnline()
     val g2 = TripsHelper.doc2lf(
-      onlineParser.onlineParse(TripsServers.stepDev, run(db.golds.filter(_.id == lift(id))).head.sentence))
+      onlineParser.onlineParse(SharedUtil.parserAddress.getOrElse(parser, TripsServers.drumDev),
+        run(db.golds.filter(_.id == lift(id))).head.sentence))
 
     val g1 = db.decodeLF(run(db.golds.filter(_.id == lift(id)).map(_.graph)).head).get
-    LFUtils.diff(g1, g2)
+
+//    println(g2)
+//    println("---------------")
+//    println(g1)
+    val res = LFUtils.diff(g1, g2)
+//    println(res)
+    res
   }
 
   def calcsScore(lfs:List[TripsLF]) = {

@@ -101,7 +101,7 @@ case object GetAllGoldsForEvaluation extends Action
 case class UpdateAllGoldsForEvaluation(tasks:Option[Map[String, List[TaskInfo]]]) extends Action
 case class EvaluateGold(id:Int) extends Action
 case class UpdateEvalGold(id:Int, value:Double) extends Action
-case class RecursiveEvaluate(ids:List[Int], currentID:Int) extends Action
+case class RecursiveEvaluate(ids:List[Int], currentID:Int, parser:String) extends Action
 
 
 case class TaskViewerHelper(tasks:Pot[List[TaskInfo]], deleteRes:Pot[ResultStatus],
@@ -140,18 +140,18 @@ class EvaluationHandler[M](modelRW: ModelRW[M, EvaluationHelper], user:User) ext
       else
         updated(modelRW().modify(_.tasks).setTo(modelRW().tasks.unavailable()))
 
-    case EvaluateGold(id) =>
-      updated(
-        modelRW().modify(_.evalResult).setTo(
-          if (modelRW().evalResult.contains(id))
-            modelRW().evalResult.updated(id, modelRW().evalResult(id).pending())
-          else
-            modelRW().evalResult.updated(id, Pending())
-        ),
-        Effect(
-          AjaxClient[Api2].evalGoldID(id).call().map(res => UpdateEvalGold(id, res))
-        )
-      )
+//    case EvaluateGold(id) =>
+//      updated(
+//        modelRW().modify(_.evalResult).setTo(
+//          if (modelRW().evalResult.contains(id))
+//            modelRW().evalResult.updated(id, modelRW().evalResult(id).pending())
+//          else
+//            modelRW().evalResult.updated(id, Pending())
+//        ),
+//        Effect(
+//          AjaxClient[Api2].evalGoldID(id).call().map(res => UpdateEvalGold(id, res))
+//        )
+//      )
 
     case UpdateEvalGold(id: Int, value: Double) =>
       updated(
@@ -160,7 +160,7 @@ class EvaluationHandler[M](modelRW: ModelRW[M, EvaluationHelper], user:User) ext
         )
       )
 
-    case RecursiveEvaluate(ids, index) =>
+    case RecursiveEvaluate(ids, index, parser) =>
       val id = ids(index)
       updated(modelRW().modify(_.evalResult).setTo(
         if (modelRW().evalResult.contains(id))
@@ -169,9 +169,9 @@ class EvaluationHandler[M](modelRW: ModelRW[M, EvaluationHelper], user:User) ext
           modelRW().evalResult.updated(id, Pending())
       ),
         Effect(
-          AjaxClient[Api2].evalGoldID(id).call().map(res =>
+          AjaxClient[Api2].evalGoldID(id, parser).call().map(res =>
             if (index < ids.size)
-              ActionBatch(UpdateEvalGold(id, res), RecursiveEvaluate(ids, index + 1))
+              ActionBatch(UpdateEvalGold(id, res), RecursiveEvaluate(ids, index + 1, parser))
             else
               UpdateEvalGold(id, res)
           )

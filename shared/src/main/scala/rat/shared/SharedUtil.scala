@@ -3,10 +3,10 @@ package rat.shared
 import com.github.omidb.nlp.toolsInterface.TripsServers
 
 object SharedUtil {
-  val availableParsers = List("drum-dev", "drum", "step", "rochester", "ihmc", "step-dev")
+  val availableParsers = List("drum-dev", "drum", "step", "rochester", "ihmc", "step-dev", "cabot")
 
   val parserAddress = Map("step" -> TripsServers.step, "drum" -> TripsServers.drum, "step-dev" -> TripsServers.stepDev,
-    "drum-dev" -> TripsServers.drumDev, "ihmc" -> TripsServers.ihmc, "rochester" -> TripsServers.rochester)
+    "drum-dev" -> TripsServers.drumDev, "ihmc" -> TripsServers.ihmc, "rochester" -> TripsServers.rochester, "cabot"-> "http://trips.ihmc.us/parser/cgi/cabot")
 
   def getEdgeID(e1:String, e2:String) = e1 + "-->" + e2
   def parseEdgeID(e:String) = e.split("-->")

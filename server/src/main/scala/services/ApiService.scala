@@ -18,19 +18,19 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
       db.decodeLF(g.graph).get.graph.nodes
         .filter(n => n._2.value.contains("word") && n._2.value.contains("type"))
         .map(n => {
-          val value = n._2.value("word")
+          val value = n._2.value("word").toLowerCase
           n._2 -> {
             if (value.toLowerCase.startsWith("sa_"))
               SharedUtil.speechActAlters
             else
-              AlternativeManager.getAllSenses(value).map(_.typ)
+              AlternativeManager.getAllSenses(value).map(_.typ.toLowerCase)
+
           }
         })
         .filterNot(n => n._2.contains(n._1.value("type").toLowerCase))
         .map(n => OntologyStat(g.id, n._1.value("word"), n._1.value("type"),
           AlternativeManager.ont.-->(n._1.value("type").toLowerCase).map(_.words).getOrElse(List.empty)))
-
-    }
+    }.toList.sortBy(_.word)
   }
   var lstDiff = calcLStDiff()
 
@@ -75,7 +75,7 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
     if(value.toLowerCase.startsWith("sa_"))
       Some(SharedUtil.speechActAlters.map(s => NodeAlternative("0", s, s, List.empty, isWordNetMapping = false, "0" )))
     else
-      Some(AlternativeManager.getAllSenses(value))
+      Some(AlternativeManager.getAllSenses(value.toString))
   }
 
   override def getEdgeAlters(value:String): Option[List[EdgeAlternative]] = {

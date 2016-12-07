@@ -17,32 +17,24 @@ object AlternativeManager {
   import strips.lexicon._
   import strips.util.LexiconFromXML
 
-  val ontPath = "./ont.bin"
-  val lexPath = "./lex.bin"
+//  val ontPath = "./ont.bin"
+//  val lexPath = "./lex.bin"
 
   println(new java.io.File(".").getAbsolutePath)
   println("Staring to load Trips Lexicon")
 
-  val ont = if (new java.io.File(ontPath).exists) {
-    println("exist")
-    val data = scala.io.Source.fromFile(ontPath).getLines().toList.mkString
-    upickle.default.read[SOntology](data)
-  } else {
-    println("doesn't exist")
+  val ont = {
+    println("Loading Ontology")
     val data = SOntology(OntologyFromXML("./flaming-tyrion/lexicon/data/"))
-    println("didn't pass")
     val s = upickle.default.write(data)
-    SimpleWriter.write(s, ontPath)
+    //SimpleWriter.write(s, ontPath)
     data
   }
-  val lex = if (new java.io.File(lexPath).exists) {
-    val data = scala.io.Source.fromFile(lexPath).getLines().toList.mkString
-    upickle.default.read[TripsLexicon](data)
-  } else {
-
+  val lex = {
+    println("Loading Lexicon")
     val data = TripsLexicon(LexiconFromXML("./flaming-tyrion/lexicon/data/"))
     val s = upickle.default.write(data)
-    SimpleWriter.write(s, lexPath)
+    //SimpleWriter.write(s, lexPath)
     data
   }
 

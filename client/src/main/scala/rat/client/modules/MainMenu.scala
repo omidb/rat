@@ -33,7 +33,8 @@ object MainMenu {
     MenuItem(2, p => buildGrEditMenu(p), Icon.scissors, EditorLoc),
     MenuItem(3, p => "Tasks", Icon.barChart, TasksLoc),
     MenuItem(4, p => "Golds", Icon.diamond, GoldsLoc),
-    MenuItem(5, p => "Evaluation", Icon.areaChart, EvaluationLoc)
+    MenuItem(5, p => "Evaluation", Icon.areaChart, EvaluationLoc),
+    MenuItem(6, p => "Parser", Icon.gears, ParserLoc)
   )
 
   private class Backend($: BackendScope[Props, Unit]) {

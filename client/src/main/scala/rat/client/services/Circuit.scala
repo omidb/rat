@@ -103,6 +103,11 @@ case class EvaluateGold(id:Int) extends Action
 case class UpdateEvalGold(id:Int, value:Double) extends Action
 case class RecursiveEvaluate(ids:List[Int], currentID:Int, parser:String) extends Action
 
+//Parser Actions
+case class ParseLines(parser:String, domain:String, users:List[String], lines:List[String]) extends Action
+case class UpdateParsersStats(value:Map[String,Int]) extends Action
+
+
 
 case class TaskViewerHelper(tasks:Pot[List[TaskInfo]], deleteRes:Pot[ResultStatus],
                             goldRes:Pot[ResultStatus], graphs:Pot[Map[User,TripsLFViz]], user:User = User.invalidUser)
@@ -116,7 +121,24 @@ case class EvaluationHelper(tasks:Pot[Map[String, List[TaskInfo]]], evalResult:M
 
 // The base model of our application
 case class RootModel(user: Pot[User], statistics: StatisticHelper, editorHelper: EditorHelper,
-                     taskHelper:TaskViewerHelper, goldHelper:GoldViewerHelper, evaluationHelper: EvaluationHelper)
+                     taskHelper:TaskViewerHelper, goldHelper:GoldViewerHelper, evaluationHelper: EvaluationHelper,
+                     parserHelper:Pot[Map[String, Int]])
+
+
+class ParserHandler[M](modelRW: ModelRW[M, Pot[Map[String, Int]]]) extends ActionHandler(modelRW) {
+  override def handle = {
+    case ParseLines(parser, domain, users, lines) =>
+      updated(modelRW().pending(),
+        Effect(
+          AjaxClient[Api2].parseForUsers(parser, domain, users, lines).call().map(stats =>
+            UpdateParsersStats(stats)
+          )
+        )
+      )
+    case UpdateParsersStats(value) =>
+      updated(Ready(value))
+  }
+}
 
 
 class EvaluationHandler[M](modelRW: ModelRW[M, EvaluationHelper], user:User) extends ActionHandler(modelRW) {
@@ -140,18 +162,6 @@ class EvaluationHandler[M](modelRW: ModelRW[M, EvaluationHelper], user:User) ext
       else
         updated(modelRW().modify(_.tasks).setTo(modelRW().tasks.unavailable()))
 
-//    case EvaluateGold(id) =>
-//      updated(
-//        modelRW().modify(_.evalResult).setTo(
-//          if (modelRW().evalResult.contains(id))
-//            modelRW().evalResult.updated(id, modelRW().evalResult(id).pending())
-//          else
-//            modelRW().evalResult.updated(id, Pending())
-//        ),
-//        Effect(
-//          AjaxClient[Api2].evalGoldID(id).call().map(res => UpdateEvalGold(id, res))
-//        )
-//      )
 
     case UpdateEvalGold(id: Int, value: Double) =>
       updated(
@@ -257,7 +267,7 @@ class TasksHandler[M](modelRW: ModelRW[M, TaskViewerHelper]) extends ActionHandl
     case GetAllTasks =>
       updated(modelRW().modify(_.tasks).setTo(modelRW().tasks.pending()),
         Effect(
-          AjaxClient[Api2].getAllTasks(modelRW().user).call().map(tasks =>
+          AjaxClient[Api2].getAllTasks().call().map(tasks =>
             UpdateAllTasks(tasks.map(t => t.sortBy(_.id)))
           )
         )
@@ -669,7 +679,7 @@ object MainCircuit extends Circuit[RootModel] with ReactConnector[RootModel] {
     EditorHelper(User.invalidUser,
       Empty, Empty, None, SelectState(None, None),Alternatives(Empty, Empty), UndoManager(List.empty),FailResult
     ), TaskViewerHelper(Empty,Empty,Empty, Empty), GoldViewerHelper(Empty, Empty, Empty, Empty, Empty, FailResult),
-    EvaluationHelper(Empty, Map.empty[Int,Pot[Double]])
+    EvaluationHelper(Empty, Map.empty[Int,Pot[Double]]), Empty
   )
 
   // combine all handlers into one
@@ -685,6 +695,8 @@ object MainCircuit extends Circuit[RootModel] with ReactConnector[RootModel] {
     new GoldHandler(zoomRW(_.goldHelper)((m, u) => m.copy(goldHelper = u))),
 
     new EvaluationHandler(zoomRW(_.evaluationHelper)((m, u) => m.copy(evaluationHelper = u)),
-      user = zoom(_.user.headOption.getOrElse(User.invalidUser)).value)
+      user = zoom(_.user.headOption.getOrElse(User.invalidUser)).value),
+
+    new ParserHandler(zoomRW(_.parserHelper)((m, u) => m.copy(parserHelper = u)))
   )
 }

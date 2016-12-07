@@ -83,7 +83,7 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
   }
 
 
-  override def getAllTasks(user: User): Option[List[TaskInfo]] = {
+  override def getAllTasks(): Option[List[TaskInfo]] = {
     Some(run(db.tasks).map(TaskRow.toTaskInfo))
   }
 
@@ -206,5 +206,45 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
       s";;;;;;;;;;;;;;;;;;;\n;;;${g._2}\n${LFUtils.toLisp(g._3)}"
     }).mkString("\n\n")
   }
+
+  override def parseForUsers(parser: String, domain:String, users: List[String], lines: List[String]) = {
+    import Impls._
+    println(lines)
+    println(users)
+    val onlineParser = new TripsOnline()
+    val tsks = getAllTasks()
+    val glds = getAllGolds()
+    val maxID = Math.max(tsks.get.maxBy(_.id).id, glds.get.maxBy(_.id).id)
+    var taskID = maxID + 1
+
+    val toAdd = lines.map(l => {
+      val lf = TripsHelper.doc2lf(onlineParser.onlineParse(SharedUtil.parserAddress.getOrElse(parser, TripsServers.drumDev), l))
+      val userStats = users.map(u => (u,UnEdited)).toMap
+      val ti = TaskInfo(taskID, l, userStats, false, 0.0, List.empty[Comment], domain)
+      val tr = TaskRow.fromTaskInfo(ti)
+      val grs = users.map(u => GraphRow(taskID, u, lf.asJson.noSpaces))
+      taskID += 1
+      (tr, grs)
+    })
+
+
+    toAdd.foreach {
+      case (tr, grs) =>
+        run(db.tasks.insert(lift(tr)))
+        grs.foreach(g => run(db.graphs.insert(lift(g))))
+    }
+
+    (getAllGolds().get ::: getAllTasks().get).flatMap(x => x.userStat.toList).groupBy(_._1).map(x => x._1 -> x._2.size)
+
+
+  }
+//
+//
+//
+//    val g = TripsHelper.doc2lf(
+//      onlineParser.onlineParse(SharedUtil.parserAddress.getOrElse(parser, TripsServers.drumDev), "")
+//    )
+//
+//  }
 
 }

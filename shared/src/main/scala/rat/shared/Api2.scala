@@ -12,7 +12,7 @@ trait Api2 {
 
   def getUserTasks(user: User): Option[List[TaskInfo]]
 
-  def getAllTasks(user: User): Option[List[TaskInfo]]
+  def getAllTasks(): Option[List[TaskInfo]]
 
   def deleteTask(user:User, taskID:Int): ResultStatus
 
@@ -43,6 +43,9 @@ trait Api2 {
   def getLispForGolds(ids:List[Int]):String
 
   def rollBack(goldID:Int): ResultStatus
+
+  def parseForUsers(parser:String, domain:String, users:List[String], lines:List[String]):Map[String, Int]
+
 
 
 

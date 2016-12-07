@@ -28,6 +28,7 @@ object SPAMain extends js.JSApp {
   case object TasksLoc extends Loc
   case object GoldsLoc extends Loc
   case object EvaluationLoc extends Loc
+  case object ParserLoc extends Loc
 
 
   val loginWrapper = MainCircuit.connect(_.user)
@@ -36,10 +37,15 @@ object SPAMain extends js.JSApp {
   val tasksWrapper = MainCircuit.connect(x => x.taskHelper)
   val goldsWrapper = MainCircuit.connect(x => x.goldHelper)
   val evaluationWrapper = MainCircuit.connect(x => x.evaluationHelper)
+  val parserWrapper = MainCircuit.connect(x => x.parserHelper)
 
-  def getRouter(userValid:CallbackB) = {
+  def getRouter(userValid:CallbackB, userAccess:CallbackB) = {
     RouterConfigDsl[Loc].buildConfig { dsl =>
       import dsl._
+
+      val parserRout =
+        (staticRoute("#parser", ParserLoc) ~> renderR(ctl => parserWrapper(proxy => ParserModule(proxy)))
+          ).addCondition(userAccess)(_ => redirectToPage(LoginLoc)(Redirect.Push))
 
       val privateRouts =
         (staticRoute(root, DashboardLoc) ~> renderR(ctl => dashboardWrapper(proxy => Dashboard(proxy)))
@@ -47,7 +53,9 @@ object SPAMain extends js.JSApp {
          | staticRoute("#tasks", TasksLoc) ~> renderR(ctl => tasksWrapper(proxy => TaskViewer(proxy)))
           | staticRoute("#golds", GoldsLoc) ~> renderR(ctl => goldsWrapper(proxy => GoldViewer(proxy)))
           | staticRoute("#evaluation", EvaluationLoc) ~> renderR(ctl => evaluationWrapper(proxy => Evaluation(proxy)))
+          | parserRout
           ).addCondition(userValid)(_ => redirectToPage(LoginLoc)(Redirect.Push))
+
 
       (staticRoute("#login", LoginLoc) ~> renderR(ctl => loginWrapper(proxy => Login(proxy, ctl)))
         | privateRouts
@@ -87,8 +95,9 @@ object SPAMain extends js.JSApp {
     GlobalStyles.addToDocument()
     // create the router
     val userValid = MainCircuit.zoom(_.user.exists(_.valid))
+    val userAccess = MainCircuit.zoom(_.user.exists(_.access == "all"))
     println(s"in the main: ${userValid()}")
-    val routerConfigs = getRouter(CallbackTo {userValid()})
+    val routerConfigs = getRouter(CallbackTo {userValid()}, CallbackTo{userAccess()})
 
     val router = Router(BaseUrl.until_#, routerConfigs)
     // tell React to render the router in the document body

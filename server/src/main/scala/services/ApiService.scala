@@ -14,9 +14,10 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
   import db.db._
 
   def calcLStDiff() = {
-    run(db.golds).flatMap{ g =>
-      db.decodeLF(g.graph).get.graph.nodes
-        .filter(n => n._2.value.contains("word") && n._2.value.contains("type"))
+    run(db.golds).flatMap { g => {
+      val nds = db.decodeLF(g.graph).get.graph.nodes
+        .filter(n => n._2.value.contains("word") && n._2.value.contains("type") &&
+          n._2.value("word") != "" && n._2.value("word") != "-")
         .map(n => {
           val value = n._2.value("word").toLowerCase
           n._2 -> {
@@ -24,13 +25,14 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
               SharedUtil.speechActAlters
             else
               AlternativeManager.getAllSenses(value).map(_.typ.toLowerCase)
-
           }
         })
         .filterNot(n => n._2.contains(n._1.value("type").toLowerCase))
         .map(n => OntologyStat(g.id, n._1.value("word"), n._1.value("type"),
           AlternativeManager.ont.-->(n._1.value("type").toLowerCase).map(_.words).getOrElse(List.empty)))
-    }.toList.sortBy(_.word)
+      nds
+    }
+    }.sortBy(_.word)
   }
   var lstDiff = calcLStDiff()
 
@@ -119,7 +121,9 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
       val us = run(db.tasks.filter(_.id == lift(taskID)).map(x => x.usersStats))
         .headOption.map(str => db.decodeUserStats(str).updated(user.id, Submitted).toList)
       val usStr = us.head.asJson.noSpaces
-      run(db.tasks.filter(_.id == lift(taskID)).update(_.usersStats -> lift(usStr), _.score -> lift(agreement)))
+      val isFinished = if(agreement == 1.0 && us.head.forall(fa => fa._2 == Submitted || fa._2 == Impossible)) 1 else 0
+      println(isFinished)
+      run(db.tasks.filter(_.id == lift(taskID)).update(_.usersStats -> lift(usStr), _.score -> lift(agreement), _.isFinished -> lift(isFinished)))
     }
     if(r == 1) SuccessResult else FailResult
   }

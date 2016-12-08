@@ -31,7 +31,7 @@ object TaskRow{
       tr.id,
       tr.sentence,
       decode[List[(String,GraphStatus)]](tr.usersStats).fold(er => List.empty, mp => mp).toMap,
-      tr.score == 1.0,
+      tr.isFinished == 1,
       tr.score,
       decode[List[Comment]](tr.comments).fold(er => List.empty, mp => mp),
       tr.domain

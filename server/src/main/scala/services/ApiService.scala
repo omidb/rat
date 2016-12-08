@@ -77,7 +77,7 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
     if(value.toLowerCase.startsWith("sa_"))
       Some(SharedUtil.speechActAlters.map(s => NodeAlternative("0", s, s, List.empty, isWordNetMapping = false, "0" )))
     else
-      Some(AlternativeManager.getAllSenses(value.toString))
+      Some(AlternativeManager.getAllSenses(value.toString.toLowerCase))
   }
 
   override def getEdgeAlters(value:String): Option[List[EdgeAlternative]] = {

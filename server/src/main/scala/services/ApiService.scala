@@ -37,6 +37,7 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
   var lstDiff = calcLStDiff()
 
 
+
   override def signIn(userName: UserName):User = {
     UserManager.checkUser(userName)
   }
@@ -56,7 +57,7 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
     run(db.tasks).map(TaskRow.toTaskInfo)
       .foreach(t => {
         val x = run(db.graphs.filter(_.id == lift(t.id)).map(_.graph)).flatMap(str => db.decodeLF(str))
-        println(t.id)
+//        println(t.id)
         val score = if(t.userStat.values.toList.contains(UnEdited)) 0.0 else calcsScore(x)
         val isFinished = if(score == 1.0 || t.userStat.forall(_._2 == Impossible)) 1 else 0
         run(db.tasks.filter(_.id == lift(t.id)).update(_.score -> lift(score), _.isFinished -> lift(isFinished)))
@@ -205,16 +206,21 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
   }
 
   override def getLispForGolds(ids:List[Int]):String = {
+//    println("Exporting to Lisp")
+//    val ids = ids2.slice(129, 131)
     val glds = run(db.golds).map(g => (g.id, g.sentence, db.decodeLF(g.graph).get))
-    ids.map(i => glds.find(_._1 == i).get).map(g => {
+    val res = ids.map(i => glds.find(_._1 == i).get).map(g => {
+//      println(g._1)
       s";;;;;;;;;;;;;;;;;;;\n;;;${g._2}\n${LFUtils.toLisp(g._3)}"
     }).mkString("\n\n")
+//    println(res)
+    println("Done exporting")
+
+    res
   }
 
   override def parseForUsers(parser: String, domain:String, users: List[String], lines: List[String]) = {
     import Impls._
-    println(lines)
-    println(users)
     val onlineParser = new TripsOnline()
     val tsks = getAllTasks()
     val glds = getAllGolds()
@@ -241,6 +247,14 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
     (getAllGolds().get ::: getAllTasks().get).flatMap(x => x.userStat.toList).groupBy(_._1).map(x => x._1 -> x._2.size)
 
 
+  }
+
+  override def resetGraph(user:String, id:Int): Unit = {
+    val sentence = run(db.tasks.filter(_.id == lift(id)).map(_.sentence)).head
+    val onlineParser = new TripsOnline()
+    val lf =  TripsHelper.doc2lf(onlineParser.onlineParse(TripsServers.stepDev, sentence))
+    val lfs = lf.asJson.noSpaces
+    run(db.graphs.filter(gr => gr.id == lift(id) && gr.user == lift(user)).update(_.graph -> lift(lfs)))
   }
 //
 //

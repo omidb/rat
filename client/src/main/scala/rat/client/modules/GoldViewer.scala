@@ -69,7 +69,7 @@ object GoldViewer {
                     OButton(
                       OButton.Props(
                         if(tasksPot().isReady)
-                          p.proxy.dispatch(GetLispForGolds(tasksPot().get.map(_.id)))
+                          p.proxy.dispatch(GetRecursiveLispForGolds(tasksPot().get.map(_.id), 0, ""))
                         else Callback.empty,
                         style = CommonStyle.success
                       ), "To Lisp"

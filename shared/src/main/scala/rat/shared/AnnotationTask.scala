@@ -73,8 +73,10 @@ object LFUtils {
         else
           s"($gr ONT::${nd.id} (:* ${wordType.mkString(" ")}) ${zips.map{case (e,n) => ":"+e+ " ONT::" + n}.mkString(" ")} ${mp.mkString(" ")} )"
     }
-
-    s"(\n${lf.graph.nodes.map(n => nodeStr(n._2)).mkString("\n")}\n)"
+    println("creating lisp")
+    val res = s"(\n${lf.graph.nodes.map(n => nodeStr(n._2)).mkString("\n")}\n)"
+    println(res)
+    res
   }
 
 

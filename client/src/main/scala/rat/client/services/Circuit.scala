@@ -10,6 +10,7 @@ import boopickle.Default._
 import com.github.omidb.nlp.toolsInterface.TripsLF
 import rat.client.components.{EdgeViz, GraphUtil, NodeViz, TripsLFViz}
 import com.softwaremill.quicklens._
+import com.sun.glass.ui.MenuItem.Callback
 import dgraph.DEdge
 
 import scala.concurrent.Future
@@ -55,7 +56,11 @@ case class SaveEditedGraph(id:Int) extends Action
 case class UpdateSaveResult(res:ResultStatus) extends Action
 
 case class UpdateSelectedTask(id:Option[Int]) extends Action
-case class UpdateSelectedLastTask(id:Option[Int]) extends Action
+
+case class ResetMyGraph(id:Int, isGold:Boolean) extends Action
+//case class UpdateSelectedLastTask(id:Option[Int]) extends Action
+
+case class SaveAndSwitch(proposedID:Option[Int], save:Boolean, switch:Boolean, isGold:Boolean) extends Action
 
 //golds in Graph
 case class SaveEditedGold(id:Int) extends Action
@@ -92,7 +97,9 @@ case class GetGoldGraphs(id:Int) extends Action
 case class UpdateGoldGraph(lfs: Option[TripsLFViz]) extends Action
 case class SearchGold(str:String) extends Action
 case class GetLispForGolds(ids:List[Int]) extends Action
+case class GetRecursiveLispForGolds(ids:List[Int], startIndex:Int, results:String) extends Action
 case class UpdateLisp(lisp:String) extends Action
+
 case class RollbackGold(goldID:Int) extends Action
 case class UpdateRollbackResult(res:ResultStatus) extends Action
 
@@ -230,19 +237,40 @@ class GoldHandler[M](modelRW: ModelRW[M, GoldViewerHelper]) extends ActionHandle
         )
       )
 
-    case GetLispForGolds(ids) =>
-      println("get Lisp")
+    case GetRecursiveLispForGolds(ids, index, results) =>
+      val (to, isDone) = if(index + 60 < ids.size) (index + 60, false) else (ids.size, true)
+      println(s"from: $index , to: $to , isDone?:$isDone")
       updated(modelRW().modify(_.lisp).setTo(modelRW().lisp.pending()),
         Effect(
-          AjaxClient[Api2].getLispForGolds(ids).call().map(lisp =>
-            UpdateLisp(lisp)
+          AjaxClient[Api2].getLispForGolds(ids.slice(index, to)).call().map(lisp => {
+
+            if (!isDone)
+              GetRecursiveLispForGolds(ids, to, results + "\n" + lisp)
+            else
+              UpdateLisp(results + "\n" + lisp)
+          }
           )
         )
       )
 
+
+//    case GetLispForGolds(ids) =>
+//      println("get Lisp")
+//      updated(modelRW().modify(_.lisp).setTo(modelRW().lisp.pending()),
+//        Effect(
+//          AjaxClient[Api2].getLispForGolds(ids).call().map(lisp =>
+//            {
+//              println(lisp)
+//            UpdateLisp(lisp)
+//            }
+//          )
+//        )
+//      )
+
     case UpdateLisp(lisp) =>
       println("update Lisp")
       updated(modelRW().modify(_.lisp).setTo(Ready(lisp)))
+
 
     case RollbackGold(taskID) =>
       updated(modelRW().modify(_.rollbackRes).setTo(modelRW().rollbackRes.pending()),
@@ -373,14 +401,48 @@ case class EditorHelper(user: User, lf:Pot[TripsLFViz], taskInfos:Pot[List[TaskI
 class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(modelRW) {
   override def handle = {
 
-    case UpdateSelectedLastTask(id) =>
-      updated(
-        modelRW().modify(_.lastSelectedTask).setTo(id)
-      )
+//    case UpdateSelectedLastTask(id) =>
+//      println(s"update last selected task to $id")
+//      updated(
+//        modelRW().modify(_.lastSelectedTask).setTo(id)
+//      )
+//
+
+    case ResetMyGraph(id, isGold) =>
+      effectOnly(Effect(AjaxClient[Api2].resetGraph(modelRW().user.id, id).call().map(x =>
+        if(isGold) GetGoldGraphForEdit(id) else GetUserGraph(id)
+      )))
 
     case UpdateSelectedTask(id) =>
+//      println(s"update selected task to $id")
       updated(
         modelRW().modify(_.selectedTask).setTo(id)
+      )
+
+    case SaveAndSwitch(pid, save, switch, isGold) =>
+      updated(
+        modelRW().copy(selectedTask = pid, lastSelectedTask = modelRW().selectedTask),
+        Effect(
+          Future {
+            val saveAction =
+              if (save && isGold)
+                SaveEditedGold(modelRW().lastSelectedTask.get)
+              else if (save && !isGold) {
+//                println(s"It is a task ${modelRW().lastSelectedTask}")
+                SaveEditedGraph(modelRW().lastSelectedTask.get)
+              }
+              else NoAction
+
+            val switchAction =
+              if(switch && isGold)
+                List(GetGoldGraphForEdit(pid.get), ClearUndo, SelectAction(None, None))
+              else if(switch && !isGold)
+                List(GetUserGraph(pid.get), ClearUndo, SelectAction(None, None))
+              else List(UpdateEditorGraph(None))
+
+            ActionBatch((saveAction :: switchAction):_*)
+          }
+        )
       )
 
     case UpdateUserG(user) => updated(modelRW().modify(_.user).setTo(user))
@@ -532,7 +594,7 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(m
       )
 
     case GetUserTasks =>
-      println(modelRW().user)
+//      println(modelRW().user)
       updated(modelRW().copy(taskInfos = modelRW().taskInfos.pending()),
         Effect(
           AjaxClient[Api2].getUserTasks(modelRW().user).call().map(tasks =>
@@ -542,12 +604,11 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(m
       )
 
     case GetGoldsForEdit =>
-      println(modelRW().user)
+//      println(modelRW().user)
       updated(modelRW().copy(taskInfos = modelRW().taskInfos.pending()),
         Effect(
           AjaxClient[Api2].getAllGolds().call().map(golds =>
-            {println(golds)
-            UpdateUserTasks(golds)}
+            UpdateUserTasks(golds)
           )
         )
       )
@@ -559,7 +620,7 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(m
         updated(modelRW().copy(taskInfos = modelRW().taskInfos.unavailable()))
 
     case GetUserGraph(id) =>
-      println(s"Get graph $id")
+//      println(s"Get graph $id")
       updated(modelRW().copy(lf = modelRW().lf.pending()),
         Effect(
           AjaxClient[Api2].getUserGraph(modelRW().user, id).call().map(lf =>
@@ -569,7 +630,7 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(m
       )
 
     case GetGoldGraphForEdit(id) =>
-      println(s"Get gold $id")
+//      println(s"Get gold $id")
       updated(modelRW().copy(lf = modelRW().lf.pending()),
         Effect(
           AjaxClient[Api2].getGold(id).call().map(lf => UpdateEditorGraph(lf))
@@ -577,20 +638,21 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(m
       )
 
     case UpdateEditorGraph(lfo) =>
+//      println(s"Update Editor Graph ${lfo.isDefined}")
       if (lfo.isDefined)
         updated(modelRW().copy(lf = Ready(GraphUtil.layoutGraph(lfo.get))))
       else
         updated(modelRW().copy(lf = modelRW().lf.unavailable()))
 
       case SaveEditedGraph(id) =>
-        println(s"save $id")
-        println(GraphUtil.tripsLFViz2tripsLF(modelRW().lf.get))
+//        println(s"save task $id")
+//        println(modelRW().lf)
         effectOnly(Effect(AjaxClient[Api2].saveTask(modelRW().user, id,
           GraphUtil.tripsLFViz2tripsLF(modelRW().lf.get)).call()
           .map(res => UpdateSaveResult(res))))
       //golds in Graph
       case SaveEditedGold(id) =>
-        println(s"save gold $id")
+//        println(s"save gold $id")
         effectOnly(Effect(AjaxClient[Api2].saveGold(modelRW().user, id,
           GraphUtil.tripsLFViz2tripsLF(modelRW().lf.get)).call()
           .map(res => UpdateSaveResult(res))))
@@ -647,7 +709,7 @@ class GraphHandler[M](modelRW: ModelRW[M, EditorHelper]) extends ActionHandler(m
       )
 
     case ClearUndo =>
-      println("Clear Undo")
+//      println("Clear Undo")
       updated(
         modelRW().copy(undoManager = UndoManager(List.empty))
       )

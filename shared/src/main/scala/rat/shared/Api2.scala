@@ -47,6 +47,8 @@ trait Api2 {
 
   def parseForUsers(parser:String, domain:String, users:List[String], lines:List[String]):Map[String, Int]
 
+  def resetGraph(user:String, id:Int): Unit
+
 
 
 

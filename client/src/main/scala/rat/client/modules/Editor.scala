@@ -36,7 +36,7 @@ object Editor {
                    edgeAlterSelected: Option[EdgeAlternative] = None, nodeAlterSelected: Option[NodeAlternative] = None,
                    infoSearch: String = "",
                    nodeEdgeSearch: String = "", showGold:Boolean = false,
-                   switchTasks:Boolean=false, switchTab:Boolean=false)
+                   switchTasks:Boolean=false, switchTab:Boolean=false, proposedSelect:Option[Int] = None)
 
   class Backend($: BackendScope[Props, State]) extends OnUnmount {
 
@@ -139,51 +139,19 @@ object Editor {
         val newNode = NodeViz(Map("-" -> "-"))
         val add = OButton(OButton.Props(p.proxy.dispatch(
           ActionBatch(AddNode(newNode), LayoutLF)), CommonStyle.success), Icon.plus)
-        add
-      }
-    }
 
-    def getTasksOrGolds(s:State, p:Props):Callback = {
-      println(s"show golds ${s.showGold}")
-      val tsksOrGolds =
+        val id = p.proxy.zoom(_.selectedTask).apply().get
+        val reset = OButton(
+          OButton.Props(
+            p.proxy.dispatch(
+              ActionBatch(ResetMyGraph(id, s.showGold),
+                SelectAction(None, None))),
+            CommonStyle.danger, addStyles = Seq(bss.pullRight)), "Reset Graph")
         if(!s.showGold)
-           p.proxy.dispatch(ActionBatch(GetGoldsForEdit, UpdateSelectedTask(None))) >>
-             $.modState(_.copy(showGold = true, edgeAlterSelected = None, nodeAlterSelected = None))
-         else p.proxy.dispatch(ActionBatch(GetUserTasks, UpdateSelectedTask(None))) >> $.modState(_.copy(
-          showGold = false, edgeAlterSelected = None, nodeAlterSelected = None))
-
-      tsksOrGolds >> p.proxy.dispatch(UpdateEditorGraph(None))
-    }
-
-    def saveSwitchTask(s:State, p:Props, save:Boolean = true, switch:Boolean = true):Callback = {
-//      println(s"____________________$save ___ $switch ____________________")
-//      val saveCallback = if(save && s.lastSelectedTask.isDefined) saveLastTask(s,p) else Callback.empty
-//      val switchCallback = if(switch) {
-//        if (s.showGold)
-//          p.proxy.dispatch(GetGoldGraphForEdit(s.selectedTask.get))
-//        else
-//          p.proxy.dispatch(GetUserGraph(s.selectedTask.get))
-//      } else Callback.empty
-
-      p.proxy.dispatch(ClearUndo) >> p.proxy.dispatch(SelectAction(None, None)) >>
-        {
-          if(save && p.proxy.zoom(_.lastSelectedTask).apply().isDefined) saveLastTask(s,p) else Callback.empty
-        } >> {
-        if(switch) {
-          if (s.showGold)
-            p.proxy.dispatch(GetGoldGraphForEdit(p.proxy.zoom(_.selectedTask.get).apply()))
-          else
-            p.proxy.dispatch(GetUserGraph(p.proxy.zoom(_.selectedTask.get).apply()))
-        } else Callback.empty
+          <.div(add, reset)
+        else
+          add
       }
-    }
-
-    def saveLastTask(s:State, p:Props):Callback = {
-//      println(s"Saving ${s.lastSelectedTask}")
-      if (s.showGold)
-        p.proxy.dispatch(SaveEditedGold(p.proxy.zoom(_.lastSelectedTask.get).apply()))
-      else
-        p.proxy.dispatch(SaveEditedGraph(p.proxy.zoom(_.lastSelectedTask.get).apply()))
     }
 
     def render(s: State, p: Props) = {
@@ -201,7 +169,7 @@ object Editor {
         p.proxy().lf.head.graphViz.edges.maxBy(_._2.value.labelLoc.topLeft.y)._2.value.labelLoc.topLeft.y + 400
       else 500
 
-
+//      println("RENDERING ..........")
       <.div(^.className := "row",
         if (s.switchTasks || s.switchTab) modal(s, p) else <.div(),
         <.div(^.className := "col-sm-2", ^.overflowY := "auto", ^.maxHeight := 650,
@@ -216,11 +184,11 @@ object Editor {
                           <.input(^.`type` := "checkbox", ^.className := "form-check-input", ^.checked := s.showGold,
                             ^.onChange --> {
                               if(pr().selectedTask.isDefined && !pr.zoom(_.undoManager.actionStack.isEmpty).value) {
-                                println("I am here")
-                                $.modState(_.copy(switchTab = true, showGold = !s.showGold))
+//                                println("I am here")
+                                $.modState(_.copy(switchTab = true))
                               }
                               else {
-                                println("I am here 2")
+//                                println("I am here 2")
                                 getTasksOrGolds(s,p)
                               }
                             }
@@ -259,21 +227,10 @@ object Editor {
                       style = styles,
                       onClick =
                         if (lfPot().isReady && !pr.zoom(_.undoManager.actionStack.isEmpty).value) {
-                          pr.dispatch(ActionBatch(UpdateSelectedLastTask(p.proxy.zoom(_.selectedTask).apply()),
-                            UpdateSelectedTask(Some(gi.id)))) >> $.modState(_.copy(switchTasks = true))
-
+                          $.modState(_.copy(switchTasks = true, proposedSelect = Some(gi.id)))
                         }
                         else {
-//                          println("Doing Normal")
-                          p.proxy.dispatch(ClearUndo) >> p.proxy.dispatch(SelectAction(None, None)) >> {
-                            if (!s.showGold)
-                              pr.dispatch(ActionBatch(UpdateSelectedLastTask(pr().selectedTask),
-                                UpdateSelectedTask(Some(gi.id)), GetUserGraph(gi.id)))
-                            else
-                              pr.dispatch(ActionBatch(UpdateSelectedLastTask(pr().selectedTask),
-                                UpdateSelectedTask(Some(gi.id)), GetGoldGraphForEdit(gi.id)))
-
-                          }
+                          pr.dispatch(SaveAndSwitch(Some(gi.id), save = false, switch = true, s.showGold))
                         }
                     )
                   }
@@ -483,8 +440,21 @@ object Editor {
         )
       )
     }
+    def getTasksOrGolds(s:State, p:Props):Callback = {
+//      println(s"show golds ${s.showGold}")
+      val tsksOrGolds =
+        if(!s.showGold)
+          p.proxy.dispatch(ActionBatch(GetGoldsForEdit)) >>
+            $.modState(_.copy(showGold = true, edgeAlterSelected = None, nodeAlterSelected = None, proposedSelect = None))
+        else
+          p.proxy.dispatch(ActionBatch(GetUserTasks)) >> $.modState(_.copy(
+            showGold = false, edgeAlterSelected = None, nodeAlterSelected = None, proposedSelect = None))
+
+      tsksOrGolds >> p.proxy.dispatch(UpdateEditorGraph(None))
+    }
 
     def modal(s:State, p:Props) = {
+
       Modal(Modal.Props(
         // header contains a cancel button (X)
         header = hide =>
@@ -492,30 +462,33 @@ object Editor {
               if(s.switchTasks) "Are you sure that you want change task?"
               else if(s.switchTab) "Are you sure that you want to switch to golds?"
               else "Close me!")),
-        // footer has the OK button that submits the form before hiding it
         footer = hide => {
-//          println(s"Last Selected ${s.lastSelectedTask}")
-//          println(s"Selected ${s.selectedTask}")
+//          println(s"switch task ${s.switchTasks} switch tab ${s.switchTab} gold: ${s.showGold}")
           <.span(
             Button(
-              Button.Props(hide >> {
-                //println(s"selected task: ${s.selectedTask}")
-                if (s.switchTasks) saveSwitchTask(s, p, save = true, switch = true)
-                else if(s.switchTab) saveSwitchTask(s, p, save = true, switch = false) >> getTasksOrGolds(s, p)
-                else Callback.empty
-              }),
+              Button.Props(
+                if (s.switchTasks)
+                  p.proxy.dispatch(SaveAndSwitch(s.proposedSelect, save = true, switch = true, s.showGold)) >> hide
+                else if (s.switchTab)
+                  p.proxy.dispatch(
+                    ActionBatch(SaveAndSwitch(None, save = true, switch = false, s.showGold),
+                    if(!s.showGold) GetGoldsForEdit else GetUserTasks, ClearUndo, SelectAction(None, None))) >>
+                    $.modState(_.copy(showGold = !s.showGold, edgeAlterSelected = None, nodeAlterSelected = None, proposedSelect = None)) >> hide
+                else hide),
               "Save And Leave"),
             Button(
               Button.Props(
-                if (s.switchTasks) hide >> saveSwitchTask(s, p, save = false, switch = true)
-                else if (s.switchTab) hide >> saveSwitchTask(s, p, save = false, switch = false) >>getTasksOrGolds(s, p)
+                if (s.switchTasks)
+                  hide >> p.proxy.dispatch(SaveAndSwitch(s.proposedSelect, save = false, switch = true, s.showGold))
+                else if (s.switchTab)
+                  hide >> p.proxy.dispatch(SaveAndSwitch(None, save = false, switch = false, !s.showGold))
                 else hide
               ),
               "Leave")
           )
         },
-        // this is called after the modal has been hidden (animation is completed)
-        closed = $.modState(_.copy(switchTab = false, switchTasks = false)))//formClosed(s, p)),
+
+        closed = $.modState(_.copy(switchTab = false, switchTasks = false)))
 
 
       )

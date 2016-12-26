@@ -9,12 +9,13 @@ import scala.collection.immutable.TreeMap
 import scala.scalajs.js
 import rat.shared._
 
-case class NodeViz(value:Map[String,String],
-                   topString:String = "-", downString:String = "-", rect:RRec = RRec.empty, isSelected:Boolean = false)
+case class NodeViz(value:Map[String,String], topString:String = "-", downString:String = "-", rect:RRec = RRec.empty,
+                   isSelected:Boolean = false, fake:Boolean = false)
 
 case class EdgeViz(value:String,
                    label:String = "-", labelLoc:RRec = RRec.empty, points:List[RPoint] = List.empty[RPoint],
-                   color:String = "black", isSelected:Boolean = false, startOn:Boolean = false, endOn:Boolean = false)
+                   color:String = "black", isSelected:Boolean = false, startOn:Boolean = false, endOn:Boolean = false,
+                   fake:Boolean = false)
 object EdgeViz {
   def empty = EdgeViz("content", "content")
 }
@@ -50,20 +51,63 @@ object GraphUtil {
 
   def move(p: Array[Double]) = s"translate(${p(0)},${p(1)})"
 
-  def tripsLF2tripsLFViz(lf: TripsLF): TripsLFViz = {
+  def tripsLF2tripsLFViz(lfo: TripsLF): TripsLFViz = {
+    val extensibleNodes = lfo.graph.nodes
+      .filter(_._2.value.keys.exists(str => str.toLowerCase == "scale" || str.toLowerCase == "unit"))
+    var gr = lfo.graph.copy(nodes = lfo.graph.nodes.map(n => n._1 -> n._2.copy(value = n._2.value.filterNot(str => str._1.toLowerCase == "unit" || str._1.toLowerCase == "scale"))))
+
+    for((enId, en) <- extensibleNodes) {
+      if (en.value.keys.exists(str => str.toLowerCase == "scale")) {
+        val scale = en.value.filter(_._1.toLowerCase == "scale").head._2
+        val (newNode, newgr) = gr.addNode(Map("type" -> scale, "scale" -> scale, "isFake" -> ""), "scale", enId)
+        gr = newgr
+      }
+
+      if (en.value.keys.exists(str => str.toLowerCase == "unit")) {
+        val unit = en.value.filter(_._1.toLowerCase == "unit").head._2
+        gr = gr.addNode(Map("type" -> unit, "unit" -> unit, "isFake" -> ""), "unit", enId)._2
+      }
+    }
+
+    val lf = lfo.copy(graph = gr)
     val lfsViz =
       TripsLFViz(lf.rootNode,
         lf.graph.map(
           (nId, n) => {
             val (topStr,downStr) = createNodeText(n)
-            NodeViz(n, topStr, downStr, RRec(RPoint(), RVector()))
+            NodeViz(n, topStr, downStr, RRec(RPoint(), RVector()), fake = n.contains("isFake"))
           },
           (eId, e) => EdgeViz(e, e)
         ))
     lfsViz
   }
 
-  def tripsLFViz2tripsLF(lfviz: TripsLFViz): TripsLF = {
+  def tripsLFViz2tripsLF(lfvizo: TripsLFViz): TripsLF = {
+
+    val fakeNodes = lfvizo.graphViz.nodes.filter(_._2.value.fake)
+    var gr = lfvizo.graphViz
+    for ((fId, fn) <- fakeNodes) {
+      val ins = gr.inMap(fId)
+      val edges = ins.map(i => gr.edges.filter(_._1 == (i ,fId)).head)
+      for((eID,e) <- edges){
+        if(e.value.value == "scale")
+          gr = gr.copy(
+            nodes = gr.nodes.updated(eID._1,
+              gr.nodes(eID._1).copy(value =
+                gr.nodes(eID._1).value.copy(value =
+                  gr.nodes(eID._1).value.value.updated("scale", fn.value.value("type"))))))
+
+        if(e.value.value == "unit")
+          gr = gr.copy(
+            nodes = gr.nodes.updated(eID._1,
+              gr.nodes(eID._1).copy(value =
+                gr.nodes(eID._1).value.copy(value =
+                  gr.nodes(eID._1).value.value.updated("unit", fn.value.value("type"))))))
+      }
+      edges.foreach(e => gr = gr.removeEdge(e._1._1, e._1._2))
+    }
+    fakeNodes.foreach(n => gr = gr.removeNode(n._1))
+    val lfviz = lfvizo.copy(lfvizo.rootNode, gr)
     val lf =
       TripsLF(
         rootNode = lfviz.rootNode,

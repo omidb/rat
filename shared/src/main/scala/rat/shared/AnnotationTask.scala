@@ -16,6 +16,7 @@ object LFUtils {
 
   def diff(lf1:TripsLF, lf2:TripsLF):Double = {
 
+    def cnd1(str:String) = str == "type" || str == "word" || str == "unit" || str == "scale"
     def fltr(mp:Map[String,String], cnd:(String) => Boolean) = {
       for(
         (ky,vl) <- mp
@@ -27,7 +28,7 @@ object LFUtils {
         (ni1, n1) <- lf1.graph.nodes
         (ni2, n2) <- lf2.graph.nodes
       } yield {
-        ((n1,n2), fltr(n1.value, _ != "id") == fltr(n2.value, _ != "id"))
+        ((n1,n2), fltr(n1.value, cnd1) == fltr(n2.value, cnd1))
       }
 
     val nodesExist = nodesMatch.toList.groupBy(_._1._1).map(x => x._1 -> x._2.exists(_._2))
@@ -44,10 +45,10 @@ object LFUtils {
       } yield
         ((e1,e2),
           e1.value.toLowerCase == e2.value.toLowerCase &&
-            fltr(lf1.graph.nodes(e1.from).value, _ != "id")  ==
-              fltr(lf2.graph.nodes(e2.from).value, _ != "id") &&
-            fltr(lf1.graph.nodes(e1.to).value, _ != "id") ==
-              fltr(lf2.graph.nodes(e2.to).value, _ != "id")
+            fltr(lf1.graph.nodes(e1.from).value, cnd1)  ==
+              fltr(lf2.graph.nodes(e2.from).value, cnd1) &&
+            fltr(lf1.graph.nodes(e1.to).value, cnd1) ==
+              fltr(lf2.graph.nodes(e2.to).value, cnd1)
         )
 
     val edgesExist = edgesMatch.toList.groupBy(_._1._1).map(x => x._1 -> x._2.exists(_._2))

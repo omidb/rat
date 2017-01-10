@@ -6,7 +6,10 @@ import io.circe.generic.auto._
 import io.circe.parser._
 import io.circe.syntax._
 import io.getquill._
+import dgraph._
 import rat.shared.{Comment, GraphStatus, TaskInfo, User}
+
+import scala.collection.immutable.TreeMap
 
 object Impls {
   implicit val encodeKeyTupleString: KeyEncoder[(Int, Int)] = new KeyEncoder[(Int, Int)] {
@@ -85,6 +88,41 @@ class Tasks(val db: DbContext) {
     val usrStatStr = goldInfo.userStat.toList.asJson.noSpaces
     val commentsStr = goldInfo.comments.asJson.noSpaces
     run(golds.insert(lift(GoldRow(goldInfo.id, goldInfo.sentence, goldInfo.domain, usrStatStr, grStr, commentsStr))))
+  }
+
+  case class DGraphOld[N,E] (nodes:Map[Int, dgraph.Node[N]], edges:TreeMap[(Int,Int), dgraph.DEdge[E]],
+                          inMap:Map[Int,IndexedSeq[Int]], outMap:Map[Int,IndexedSeq[Int]])
+
+  case class TripsLFOld(graph:DGraphOld[Map[String,String],String], rootNode:Option[Int])
+
+  def change(str:String) = {
+    val old = decode[TripsLFOld](str).fold(er => {
+//      println(er)
+      TripsLFOld(DGraphOld(Map.empty, TreeMap.empty, Map.empty, Map.empty), None)
+    }, fb => fb)
+//    println(old)
+    val dg = TripsLF(DGraph(old.graph.nodes, old.graph.edges, old.graph.inMap, old.graph.outMap, DGraph.warshall(old.graph.nodes, old.graph.edges)), old.rootNode)
+    dg.asJson.noSpaces
+  }
+  def repair() = {
+    val news = run(graphs).toList.map(g => {
+//      println(g.graph)
+      g.copy(graph = change(g.graph))
+    })
+    val glds = run(golds).toList.map(g => {
+//      println(g.graph)
+      g.copy(graph = change(g.graph))
+    })
+    run(graphs.delete)
+    run(golds.delete)
+    for(n <- news) {
+      run(graphs.insert(lift(n)))
+    }
+
+    for(n <- glds) {
+      run(golds.insert(lift(n)))
+    }
+
   }
 
 }

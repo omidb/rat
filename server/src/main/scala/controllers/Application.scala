@@ -24,6 +24,7 @@ class Application @Inject() (implicit val config: Configuration, env: Environmen
 
   lazy val db = new JdbcContext[SqliteDialect, CamelCase]("db")
   lazy val tasks = new Tasks(db)
+//  tasks.repair()
   lazy val se = new SearchEngine(tasks)
   val apiService = new ApiService(tasks, se)
 

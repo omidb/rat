@@ -244,9 +244,14 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
         grs.foreach(g => run(db.graphs.insert(lift(g))))
     }
 
-    (getAllGolds().get ::: getAllTasks().get).flatMap(x => x.userStat.toList).groupBy(_._1).map(x => x._1 -> x._2.size)
+    val usrMp = (getAllGolds().get ::: getAllTasks().get).flatMap(x => x.userStat.toList).groupBy(_._1).map(x => x._1 -> x._2.size)
 
+    val users_notasks = for (user <- UserManager.users.keys.toList) yield {
+      if(!usrMp.keySet.contains(user)) user -> 0
+      else user -> usrMp(user)
+    }
 
+    users_notasks.toMap
   }
 
   override def resetGraph(user:String, id:Int): Unit = {

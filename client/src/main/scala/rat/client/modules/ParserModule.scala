@@ -41,12 +41,12 @@ object ParserModule {
 
     def onChange(e: ReactEventI) = {
       val tv = e.currentTarget.value
-      $.modState(_.copy(domain= tv))
+      $.modState(_.copy(domain = tv))
     }
 
     def onChangeLines(e: ReactEventI) = {
       val tv = e.currentTarget.value
-      $.modState(_.copy(lines= tv))
+      $.modState(_.copy(lines = tv))
     }
 
     def render(s: State, p: Props) = {
@@ -55,7 +55,7 @@ object ParserModule {
         <.div(^.className := "col-sm-9",
           Card(
             Card.Props(addStyles = Seq(^.height := "600px", ^.overflow := "auto")),
-            <.textarea(^.className:="form-control", ^.id:="exampleTextarea", ^.rows:="15", ^.onChange ==> onChangeLines,
+            <.textarea(^.className := "form-control", ^.id := "exampleTextarea", ^.rows := "15", ^.onChange ==> onChangeLines,
               s.lines)
           )
         ),
@@ -86,7 +86,7 @@ object ParserModule {
                     )
                   }
                 }
-              )),
+                )),
               Card(
                 Card.Props(),
                 <.div(^.className := "row",
@@ -101,14 +101,14 @@ object ParserModule {
                       ),
                       <.div(^.className := "row",
                         <.div(^.className := "col-md-6",
-                          <.input(^.`type`:="text", ^.className:="form-control", ^.onChange ==> onChange)
-//                          <.span(
-//                            <.input(^.tpe := "checkbox", ^.checked := s.useSkeleton,
-//                              ^.onChange --> $.modState(_.copy(useSkeleton = !s.useSkeleton))),
-//                            BTag("Use Skeleton", style = CommonStyle.danger)
-//                          )
+                          <.input(^.`type` := "text", ^.className := "form-control", ^.onChange ==> onChange)
+                          //                          <.span(
+                          //                            <.input(^.tpe := "checkbox", ^.checked := s.useSkeleton,
+                          //                              ^.onChange --> $.modState(_.copy(useSkeleton = !s.useSkeleton))),
+                          //                            BTag("Use Skeleton", style = CommonStyle.danger)
+                          //                          )
                         ),
-                        <.div(^.className := "col-md-6",^.textAlign:="right",
+                        <.div(^.className := "col-md-6", ^.textAlign := "right",
                           <.button(^.className := "btn btn-danger", ^.`type` := "button", "Start!",
                             ^.onClick --> p.proxy.dispatch(
                               ParseLines(
@@ -134,7 +134,7 @@ object ParserModule {
   val component = ReactComponentB[Props]("Evaluation")
     .initialState(State(Map.empty))
     .renderBackend[Backend]
-    .componentWillMount(scope => scope.props.proxy.dispatch(ParseLines("step", "ROc stories", List.empty, List.empty)))
+    .componentWillMount(scope => scope.props.proxy.dispatch(ParseLines("step", "Roc stories", List.empty, List.empty)))
     .componentWillReceiveProps(p => {
       val s = p.currentState
       if(p.currentProps.proxy().isReady) {

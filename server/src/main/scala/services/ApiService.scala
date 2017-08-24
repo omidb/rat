@@ -257,7 +257,7 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
   override def resetGraph(user:String, id:Int): Unit = {
     val sentence = run(db.tasks.filter(_.id == lift(id)).map(_.sentence)).head
     val onlineParser = new TripsOnline()
-    val lf =  TripsHelper.doc2lf(onlineParser.onlineParse(TripsServers.stepDev, sentence))
+    val lf =  TripsHelper.doc2lf(onlineParser.onlineParse(TripsServers.drumDev, sentence))
     val lfs = lf.asJson.noSpaces
     run(db.graphs.filter(gr => gr.id == lift(id) && gr.user == lift(user)).update(_.graph -> lift(lfs)))
   }

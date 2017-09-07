@@ -211,7 +211,8 @@ class ApiService(db:Tasks, se:SearchEngine) extends Api2{
     val glds = run(db.golds).map(g => (g.id, g.sentence, db.decodeLF(g.graph).get))
     val res = ids.map(i => glds.find(_._1 == i).get).map(g => {
 //      println(g._1)
-      s";;;;;;;;;;;;;;;;;;;\n;;;${g._2}\n${LFUtils.toLisp(g._3)}"
+
+      s";;;;;;;;;;;;;;;;;;;\n;;;${g._2}\n;;;${g._1}\n${LFUtils.toLisp(g._3)}"
     }).mkString("\n\n")
 //    println(res)
     println("Done exporting")

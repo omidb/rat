@@ -26,6 +26,8 @@ import scalacss.ScalaCssReact._
 import scalacss.Defaults._
 import Table.{TableHeading, TableHeadingItem, TableItem}
 
+import scala.scalajs.js.URIUtils
+
 object Evaluation {
 
   @inline private def bss = GlobalStyles.bootstrapStyles
@@ -40,6 +42,7 @@ object Evaluation {
     def render(s: State, p: Props) = {
       val tasksPot = p.proxy.zoom(_.tasks)
       val results = p.proxy.zoom(_.evalResult)
+      val lisp = p.proxy.zoom(_.lisp)
       println("-------render--------")
       println(results())
       <.div(^.className := "row",
@@ -72,7 +75,7 @@ object Evaluation {
                         case (u, Submitted) => BTag(u, style = CommonStyle.info)
                         case (u, UnEdited) => BTag(u, style = CommonStyle.danger)
                       },
-                      if(results().contains(t.id))
+                      if (results().contains(t.id))
                         List(
                           results()(t.id).renderEmpty("-"),
                           results()(t.id).renderPending(_ => Icon.spinnerAnimate),
@@ -136,19 +139,43 @@ object Evaluation {
                               BTag("Use Skeleton", style = CommonStyle.danger)
                             )
                           ),
-                          <.div(^.className := "col-md-6",^.textAlign:="right",
+                          <.div(^.className := "col-md-6", ^.textAlign := "right",
                             <.button(^.className := "btn btn-danger", ^.`type` := "button", "Start!",
                               ^.onClick -->
                                 p.proxy.dispatch(
                                   RecursiveEvaluate(
                                     tasks.filter(t => s.selectedDomains.contains(t._1) && s.selectedDomains(t._1))
-                                      .values.toList.flatten.map(_.id), 0,s.parserType
+                                      .values.toList.flatten.map(_.id), 0, s.parserType
                                   )
                                 )
                             )
                           )
                         )
                       )
+                    )
+                  )
+                ),
+                Card(
+                  Card.Props(),
+                  <.div(^.className := "row",
+                    <.div(^.className := "col-sm-4",
+                      OButton(
+                        OButton.Props(
+                            p.proxy.dispatch(
+                              GetRecursiveLispForEvaluation(
+                                tasks.filter(t => s.selectedDomains.contains(t._1) && s.selectedDomains(t._1)).flatMap(_._2).map(_.id).toList, 0, ""))
+                          ,
+                          style = CommonStyle.success
+                        ), "To Lisp"
+                      )
+                    ),
+                    <.div(^.className := "col-sm-4",
+                      lisp().renderEmpty(""),
+                      lisp().renderPending(_ => <.div(^.textAlign := "center", Icon.spinnerAnimate)),
+                      lisp().renderFailed(ex => "Faild"),
+                      lisp().renderReady(lsp =>
+                        <.a(^.download := "golds.lisp", ^.href := "data:application/octet-stream;charset=utf-8," +
+                          URIUtils.encodeURIComponent(lsp), "download"))
                     )
                   )
                 )

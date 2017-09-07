@@ -109,6 +109,9 @@ case class UpdateAllGoldsForEvaluation(tasks:Option[Map[String, List[TaskInfo]]]
 case class EvaluateGold(id:Int) extends Action
 case class UpdateEvalGold(id:Int, value:Double) extends Action
 case class RecursiveEvaluate(ids:List[Int], currentID:Int, parser:String) extends Action
+case class GetLispForEvaluation(ids:List[Int]) extends Action
+case class GetRecursiveLispForEvaluation(ids:List[Int], startIndex:Int, results:String) extends Action
+case class UpdateLispEvaluation(lisp:String) extends Action
 
 //Parser Actions
 case class ParseLines(parser:String, domain:String, users:List[String], lines:List[String]) extends Action
@@ -123,7 +126,7 @@ case class GoldViewerHelper(golds:Pot[List[TaskInfo]], rollbackRes:Pot[ResultSta
                             parseRes:Pot[ResultStatus], graph:Pot[TripsLFViz], lisp:Pot[String],
                             roolbackResult:ResultStatus, user:User = User.invalidUser)
 
-case class EvaluationHelper(tasks:Pot[Map[String, List[TaskInfo]]], evalResult:Map[Int,Pot[Double]],
+case class EvaluationHelper(tasks:Pot[Map[String, List[TaskInfo]]], evalResult:Map[Int,Pot[Double]],lisp:Pot[String],
                             currentID:Int = 0)
 
 // The base model of our application
@@ -194,6 +197,27 @@ class EvaluationHandler[M](modelRW: ModelRW[M, EvaluationHelper], user:User) ext
           )
         )
       )
+
+      ///////
+    case GetRecursiveLispForEvaluation(ids, index, results) =>
+      val (to, isDone) = if(index + 60 < ids.size) (index + 60, false) else (ids.size, true)
+      println(s"from: $index , to: $to , isDone?:$isDone")
+      updated(modelRW().modify(_.lisp).setTo(modelRW().lisp.pending()),
+        Effect(
+          AjaxClient[Api2].getLispForGolds(ids.slice(index, to)).call().map(lisp => {
+
+            if (!isDone)
+              GetRecursiveLispForEvaluation(ids, to, results + "\n" + lisp)
+            else
+              UpdateLispEvaluation(results + "\n" + lisp)
+          }
+          )
+        )
+      )
+
+    case UpdateLispEvaluation(lisp) =>
+      println("update Lisp")
+      updated(modelRW().modify(_.lisp).setTo(Ready(lisp)))
   }
 }
 
@@ -252,20 +276,6 @@ class GoldHandler[M](modelRW: ModelRW[M, GoldViewerHelper]) extends ActionHandle
           )
         )
       )
-
-
-//    case GetLispForGolds(ids) =>
-//      println("get Lisp")
-//      updated(modelRW().modify(_.lisp).setTo(modelRW().lisp.pending()),
-//        Effect(
-//          AjaxClient[Api2].getLispForGolds(ids).call().map(lisp =>
-//            {
-//              println(lisp)
-//            UpdateLisp(lisp)
-//            }
-//          )
-//        )
-//      )
 
     case UpdateLisp(lisp) =>
       println("update Lisp")
@@ -741,7 +751,7 @@ object MainCircuit extends Circuit[RootModel] with ReactConnector[RootModel] {
     EditorHelper(User.invalidUser,
       Empty, Empty, None, SelectState(None, None),Alternatives(Empty, Empty), UndoManager(List.empty),FailResult
     ), TaskViewerHelper(Empty,Empty,Empty, Empty), GoldViewerHelper(Empty, Empty, Empty, Empty, Empty, FailResult),
-    EvaluationHelper(Empty, Map.empty[Int,Pot[Double]]), Empty
+    EvaluationHelper(Empty, Map.empty[Int,Pot[Double]],Empty), Empty
   )
 
   // combine all handlers into one

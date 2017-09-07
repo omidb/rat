@@ -70,9 +70,9 @@ object LFUtils {
       val zips = lf.graph.outMap(nd.id).map(x => (lf.graph.edges((nd.id,x)).value, x))
 
         if(nd.value.contains("type") && nd.value("type").startsWith("SA_"))
-          s"( ONT::SPEECHACT ONT::${nd.id}$gr ${zips.map{case (e,n) => ":"+e + " ONT::" + n}.mkString(" ")} ${mp.mkString(" ")} )"
+          s"( ONT::SPEECHACT ONT::V${nd.id}$gr ${zips.map{case (e,n) => ":"+e + " ONT::V" + n}.mkString(" ")} ${mp.mkString(" ")} )"
         else
-          s"($gr ONT::${nd.id} (:* ${wordType.mkString(" ")}) ${zips.map{case (e,n) => ":"+e+ " ONT::" + n}.mkString(" ")} ${mp.mkString(" ")} )"
+          s"($gr ONT::V${nd.id} (:* ${wordType.mkString(" ")}) ${zips.map{case (e,n) => ":"+e+ " ONT::V" + n}.mkString(" ")} ${mp.mkString(" ")} )"
     }
     println("creating lisp")
     val res = s"(\n${lf.graph.nodes.map(n => nodeStr(n._2)).mkString("\n")}\n)"

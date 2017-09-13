@@ -96,7 +96,7 @@ case class UpdateAllGolds(tasks:Option[List[TaskInfo]]) extends Action
 case class GetGoldGraphs(id:Int) extends Action
 case class UpdateGoldGraph(lfs: Option[TripsLFViz]) extends Action
 case class SearchGold(str:String) extends Action
-case class GetLispForGolds(ids:List[Int]) extends Action
+//case class GetLispForGolds(ids:List[Int]) extends Action
 case class GetRecursiveLispForGolds(ids:List[Int], startIndex:Int, results:String) extends Action
 case class UpdateLisp(lisp:String) extends Action
 
@@ -109,7 +109,7 @@ case class UpdateAllGoldsForEvaluation(tasks:Option[Map[String, List[TaskInfo]]]
 case class EvaluateGold(id:Int) extends Action
 case class UpdateEvalGold(id:Int, value:Double) extends Action
 case class RecursiveEvaluate(ids:List[Int], currentID:Int, parser:String) extends Action
-case class GetLispForEvaluation(ids:List[Int]) extends Action
+//case class GetLispForEvaluation(ids:List[Int]) extends Action
 case class GetRecursiveLispForEvaluation(ids:List[Int], startIndex:Int, results:String) extends Action
 case class UpdateLispEvaluation(lisp:String) extends Action
 
@@ -200,16 +200,22 @@ class EvaluationHandler[M](modelRW: ModelRW[M, EvaluationHelper], user:User) ext
 
       ///////
     case GetRecursiveLispForEvaluation(ids, index, results) =>
-      val (to, isDone) = if(index + 60 < ids.size) (index + 60, false) else (ids.size, true)
-      println(s"from: $index , to: $to , isDone?:$isDone")
+//      println(ids.size)
+      val (to, isDone) = if(index + 10 < ids.size) (index + 10, false) else (ids.size, true)
+      println(s"from: $index , to: $to , isDone?:$isDone , size:${ids.size}")
       updated(modelRW().modify(_.lisp).setTo(modelRW().lisp.pending()),
         Effect(
           AjaxClient[Api2].getLispForGolds(ids.slice(index, to)).call().map(lisp => {
 
-            if (!isDone)
+            println("recieved Lisp")
+            if (!isDone) {
+              println("!isDone")
               GetRecursiveLispForEvaluation(ids, to, results + "\n" + lisp)
-            else
+            }
+            else {
+              println("isDone, updateLisp")
               UpdateLispEvaluation(results + "\n" + lisp)
+            }
           }
           )
         )

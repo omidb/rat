@@ -43,8 +43,8 @@ object Evaluation {
       val tasksPot = p.proxy.zoom(_.tasks)
       val results = p.proxy.zoom(_.evalResult)
       val lisp = p.proxy.zoom(_.lisp)
-      println("-------render--------")
-      println(results())
+//      println("-------render--------")
+//      println(results())
       <.div(^.className := "row",
         <.div(^.className := "col-sm-9",
           Card(
@@ -53,7 +53,7 @@ object Evaluation {
             tasksPot().renderPending(_ => <.div(^.textAlign := "center", Icon.spinnerAnimateLarge)),
             tasksPot().renderFailed(ex => <.div(<.p("Failed to load, Please Refresh"))),
             tasksPot().renderReady(tasks => {
-              tasks.foreach(x => println(x._1))
+//              tasks.foreach(x => println(x._1))
               Table(
                 tableHeading = TableHeading(
                   List(
@@ -199,7 +199,7 @@ object Evaluation {
           val newTs = p.currentProps.proxy.zoom(_.tasks).apply().get
             .filter(t => !s.selectedDomains.contains(t._1))
             .map(t => t._1 -> false)
-          println(s"new TS : $newTs")
+//          println(s"new TS : $newTs")
           p.$.modState(_.copy(selectedDomains = s.selectedDomains ++ newTs))
         }
         else Callback.empty

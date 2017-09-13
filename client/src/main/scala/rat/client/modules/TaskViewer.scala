@@ -104,7 +104,7 @@ object TaskViewer {
                             OButton(OButton.Props(
                               addStyles = Seq(bss.pullRight, bss.buttonXS),
                               style = CommonStyle.warning,
-                              onClick = p.proxy.dispatch(GoldTask(t.id))), "Gold")
+                              onClick = p.proxy.dispatch(GoldTask(t.id)) >> $.modState(_.copy(selectedTask = None))), "Gold")
                           else <.div()
                         )
                       )

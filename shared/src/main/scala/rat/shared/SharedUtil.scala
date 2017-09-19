@@ -3,7 +3,7 @@ package rat.shared
 import com.github.omidb.nlp.toolsInterface.TripsServers
 
 object SharedUtil {
-  val availableParsers = List("drum-dev", "drum", "step", "rochester", "ihmc", "step-dev", "cabot")
+  val availableParsers = List("drum-dev", "drum", "step", "rochester", "ihmc", "step-dev", "cabot", "bob")
 
   val parserAddress = Map("step" -> TripsServers.step, "drum" -> TripsServers.drum, "step-dev" -> TripsServers.stepDev,
     "drum-dev" -> TripsServers.drumDev, "ihmc" -> TripsServers.ihmc, "rochester" -> TripsServers.rochester, "cabot"-> "http://trips.ihmc.us/parser/cgi/cabot")
